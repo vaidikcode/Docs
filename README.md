@@ -1,69 +1,77 @@
-ProofNest Implementation
-Key Points
+# ProofNest Implementation
 
-Decentralized Ownership: ProofNest likely allows creators to prove ownership of digital work using blockchain, ensuring tamper-proof records.
-Hyperledger Fabric: It seems to use Hyperledger Fabric for a private blockchain, suitable for controlled access and privacy.
-Tech Stack: The implementation appears to combine React.js for the frontend, Golang for the backend, and SHA-256 hashing for content verification.
-Privacy Focus: Only hashes are stored on-chain, suggesting a design that prioritizes user privacy by avoiding full content uploads.
+## Key Points
+- **Decentralized Ownership**: ProofNest likely allows creators to prove ownership of digital work using blockchain, ensuring tamper-proof records.
+- **Hyperledger Fabric**: It seems to use Hyperledger Fabric for a private blockchain, suitable for controlled access and privacy.
+- **Tech Stack**: The implementation appears to combine React.js for the frontend, Golang for the backend, and SHA-256 hashing for content verification.
+- **Privacy Focus**: Only hashes are stored on-chain, suggesting a design that prioritizes user privacy by avoiding full content uploads.
 
-Overview
+## Overview
 ProofNest is a platform designed to help creators like freelancers, students, and developers prove they created digital content—such as documents, designs, or code—before anyone else. By using blockchain technology, it creates a timestamped record that’s hard to dispute, without needing lawyers or courts. The implementation provided here uses Hyperledger Fabric, a permissioned blockchain, to store these records securely.
-How It Works
+
+## How It Works
 You can upload a file or paste text into a web interface built with React.js. The system generates a unique code (a hash) for your content and sends it to a blockchain network managed by Hyperledger Fabric. This network records the hash with your identity and the time, creating a proof of ownership. Later, anyone can check the blockchain to verify who created it and when, without seeing the original content.
-Setup and Usage
+
+## Setup and Usage
 To use ProofNest, you’d need to set up a Hyperledger Fabric network, deploy the provided code, and run the web application. The backend, written in Golang, connects to the blockchain, while the frontend lets users interact easily. The system is designed to be private and secure, storing only hashes, not full files.
 
-Detailed Implementation Guide for ProofNest
-Introduction
-ProofNest addresses a common problem faced by creators: proving ownership of digital work in collaborative or freelance settings. By leveraging Hyperledger Fabric, a permissioned blockchain framework, ProofNest creates immutable, timestamped records of content hashes tied to user identities. This guide provides a complete end-to-end implementation, including chaincode, backend, frontend, and setup instructions, as requested.
-System Architecture
-ProofNest consists of three main components:
+---
 
-Frontend (React.js): A user-friendly interface for uploading files or text, computing SHA-256 hashes, and interacting with the backend.
-Backend (Golang): An API server that handles requests, manages user identities, and communicates with the blockchain using the Fabric Gateway client API.
-Blockchain (Hyperledger Fabric): A private network running Fabric v2.5, with chaincode to store and retrieve hash records.
+# Detailed Implementation Guide for ProofNest
+
+## Introduction
+ProofNest addresses a common problem faced by creators: proving ownership of digital work in collaborative or freelance settings. By leveraging Hyperledger Fabric, a permissioned blockchain framework, ProofNest creates immutable, timestamped records of content hashes tied to user identities. This guide provides a complete end-to-end implementation, including chaincode, backend, frontend, and setup instructions, as requested.
+
+## System Architecture
+ProofNest consists of three main components:
+- **Frontend (React.js)**: A user-friendly interface for uploading files or text, computing SHA-256 hashes, and interacting with the backend.
+- **Backend (Golang)**: An API server that handles requests, manages user identities, and communicates with the blockchain using the Fabric Gateway client API.
+- **Blockchain (Hyperledger Fabric)**: A private network running Fabric v2.5, with chaincode to store and retrieve hash records.
 
 The system uses SHA-256 hashing to ensure content privacy, storing only hashes on-chain, not the original files or text.
-Prerequisites
+
+## Prerequisites
 Before implementing ProofNest, ensure you have:
+- **Docker and Docker Compose**: For running the Fabric network.
+- **Go (1.16+)**: For chaincode and backend development.
+- **Node.js (16+)**: For the React frontend.
+- **Hyperledger Fabric Binaries**: Available via fabric-samples.
+- **Fabric CA Client**: For user enrollment.
 
-Docker and Docker Compose: For running the Fabric network.
-Go (1.16+): For chaincode and backend development.
-Node.js (16+): For the React frontend.
-Hyperledger Fabric Binaries: Available via fabric-samples.
-Fabric CA Client: For user enrollment.
-
-Setting Up Hyperledger Fabric
+## Setting Up Hyperledger Fabric
 ProofNest uses the Hyperledger Fabric test network for development. Follow these steps to set it up:
 
-Clone fabric-samples:
-git clone https://github.com/hyperledger/fabric-samples.git
-cd fabric-samples/test-network
+1. **Clone fabric-samples**:
+   ```bash
+   git clone https://github.com/hyperledger/fabric-samples.git
+   cd fabric-samples/test-network
+   ```
 
+2. **Start the Network**:
+   ```bash
+   ./network.sh up createChannel -ca
+   ```
+   This command starts a network with two organizations, an ordering service, and a channel named `mychannel`, using Certificate Authorities (CAs) for identity management.
 
-Start the Network:
-./network.sh up createChannel -ca
+3. **Enroll Users**:
+   Register and enroll two users, Alice and Bob, for Org1:
+   ```bash
+   export FABRIC_CA_CLIENT_HOME=$PWD/organizations/peerOrganizations/org1.example.com/
+   fabric-ca-client register --id.name alice --id.secret alicepw --id.type client
+   mkdir -p organizations/peerOrganizations/org1.example.com/users/alice@msp
+   fabric-ca-client enroll -u http://alice:alicepw@localhost:7054 --mspdir organizations/peerOrganizations/org1.example.com/users/alice@msp
+   fabric-ca-client register --id.name bob --id.secret bobpw --id.type client
+   mkdir -p organizations/peerOrganizations/org1.example.com/users/bob@msp
+   fabric-ca-client enroll -u http://bob:bobpw@localhost:7054 --mspdir organizations/peerOrganizations/org1.example.com/users/bob@msp
+   ```
 
-This command starts a network with two organizations, an ordering service, and a channel named mychannel, using Certificate Authorities (CAs) for identity management.
-
-Enroll Users: Register and enroll two users, Alice and Bob, for Org1:
-export FABRIC_CA_CLIENT_HOME=$PWD/organizations/peerOrganizations/org1.example.com/
-fabric-ca-client register --id.name alice --id.secret alicepw --id.type client
-mkdir -p organizations/peerOrganizations/org1.example.com/users/alice@msp
-fabric-ca-client enroll -u http://alice:alicepw@localhost:7054 --mspdir organizations/peerOrganizations/org1.example.com/users/alice@msp
-fabric-ca-client register --id.name bob --id.secret bobpw --id.type client
-mkdir -p organizations/peerOrganizations/org1.example.com/users/bob@msp
-fabric-ca-client enroll -u http://bob:bobpw@localhost:7054 --mspdir organizations/peerOrganizations/org1.example.com/users/bob@msp
-
-
-
-Chaincode Development
+## Chaincode Development
 The chaincode, written in Go, manages hash registration and verification. It includes two functions:
+- `registerHash`: Stores a hash with the caller’s identity and timestamp, ensuring uniqueness.
+- `getHashInfo`: Retrieves the owner and timestamp for a given hash.
 
-registerHash: Stores a hash with the caller’s identity and timestamp, ensuring uniqueness.
-getHashInfo: Retrieves the owner and timestamp for a given hash.
-
-Chaincode Code
+### Chaincode Code
+```go
 package main
 
 import (
@@ -164,23 +172,22 @@ func main() {
 		fmt.Printf("Error starting chaincode: %s", err)
 	}
 }
+```
 
-Deploying Chaincode
+### Deploying Chaincode
+1. Place the chaincode in `fabric-samples/chaincode/proofnest`.
+2. Deploy it to the network:
+   ```bash
+   ./network.sh deployCC -ccn proofnest -ccp ../chaincode/proofnest -ccl go
+   ```
 
-Place the chaincode in fabric-samples/chaincode/proofnest.
-
-Deploy it to the network:
-./network.sh deployCC -ccn proofnest -ccp ../chaincode/proofnest -ccl go
-
-
-
-Backend Development
+## Backend Development
 The backend is a Golang application using the Gin framework and the Fabric Gateway client API. It provides two endpoints:
+- `/register`: Registers a hash for a user.
+- `/verify`: Verifies ownership of a hash.
 
-/register: Registers a hash for a user.
-/verify: Verifies ownership of a hash.
-
-Backend Code
+### Backend Code
+```go
 package main
 
 import (
@@ -378,25 +385,28 @@ func main() {
 	r.POST("/verify", verifyHandler)
 	r.Run(":8080")
 }
+```
 
-Setup Instructions
+### Setup Instructions
+1. Install dependencies:
+   ```bash
+   go get github.com/gin-gonic/gin
+   go get github.com/hyperledger/fabric-gateway/pkg/client
+   go get github.com/hyperledger/fabric-gateway/pkg/identity
+   ```
 
-Install dependencies:
-go get github.com/gin-gonic/gin
-go get github.com/hyperledger/fabric-gateway/pkg/client
-go get github.com/hyperledger/fabric-gateway/pkg/identity
+2. Update `userMSPs` and `tlsCertPath` in the code with the correct paths from your fabric-samples directory.
 
+3. Run the backend:
+   ```bash
+   go run main.go
+   ```
 
-Update userMSPs and tlsCertPath in the code with the correct paths from your fabric-samples directory.
-
-Run the backend:
-go run main.go
-
-
-
-Frontend Development
+## Frontend Development
 The frontend is a React.js single-page application that allows users to register and verify hashes. It uses the Web Crypto API for SHA-256 hashing and Axios for API requests.
-Frontend Code
+
+### Frontend Code
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -561,54 +571,39 @@ Frontend Code
   </script>
 </body>
 </html>
+```
 
-Setup Instructions
+### Setup Instructions
+1. Save the HTML file as `index.html`.
+2. Serve it using a static file server (e.g., `npx serve`).
+3. Ensure the backend is running at `http://localhost:8080`.
 
-Save the HTML file as index.html.
-Serve it using a static file server (e.g., npx serve).
-Ensure the backend is running at http://localhost:8080.
-
-Cloud-Native Enhancements
+## Cloud-Native Enhancements
 To make ProofNest cloud-native, consider:
+- **Containerization**: Package the backend and chaincode in Docker containers.
+- **Orchestration**: Deploy using Kubernetes for scalability.
+- **CI/CD**: Set up pipelines with GitHub Actions or Jenkins for automated testing and deployment.
 
-Containerization: Package the backend and chaincode in Docker containers.
-Orchestration: Deploy using Kubernetes for scalability.
-CI/CD: Set up pipelines with GitHub Actions or Jenkins for automated testing and deployment.
+### Example Docker Configuration
+| Component | Dockerfile Example |
+|-----------|--------------------|
+| Backend   | `FROM golang:1.16`<br>`WORKDIR /app`<br>`COPY . .`<br>`RUN go build -o main`<br>`CMD ["./main"]` |
+| Chaincode | Managed by Fabric’s chaincode-as-a-service model. |
 
-Example Docker Configuration
+## Security Considerations
+- **Private Key Management**: Storing private keys in files is insecure for production. Use Hardware Security Modules (HSMs) or secure vaults.
+- **Authentication**: The current implementation assumes usernames without authentication. Add OAuth or JWT for secure user management.
+- **Network Access**: Restrict access to the Fabric network to authorized nodes only.
 
+## Limitations
+- **Scalability**: The test network is for development. Production requires a multi-node setup.
+- **User Enrollment**: Manual enrollment is used here. Automate with a registration service in production.
+- **NFT Certificates**: The project mentions ProofNest Certificates as NFTs, but this implementation omits them for simplicity. Future versions could integrate NFT standards like ERC-721 on Fabric-EVM.
 
-
-Component
-Dockerfile Example
-
-
-
-Backend
-FROM golang:1.16WORKDIR /appCOPY . .RUN go build -o mainCMD ["./main"]
-
-
-Chaincode
-Managed by Fabric’s chaincode-as-a-service model.
-
-
-Security Considerations
-
-Private Key Management: Storing private keys in files is insecure for production. Use Hardware Security Modules (HSMs) or secure vaults.
-Authentication: The current implementation assumes usernames without authentication. Add OAuth or JWT for secure user management.
-Network Access: Restrict access to the Fabric network to authorized nodes only.
-
-Limitations
-
-Scalability: The test network is for development. Production requires a multi-node setup.
-User Enrollment: Manual enrollment is used here. Automate with a registration service in production.
-NFT Certificates: The project mentions ProofNest Certificates as NFTs, but this implementation omits them for simplicity. Future versions could integrate NFT standards like ERC-721 on Fabric-EVM.
-
-Conclusion
+## Conclusion
 This implementation provides a functional ProofNest platform using Hyperledger Fabric v2.5, Golang, and React.js. It allows users to register and verify ownership of digital content securely, with hashes stored on a private blockchain. For production, enhance security, scalability, and user management as outlined.
-Key Citations
 
-Hyperledger Fabric v2.5 Documentation
-Fabric Gateway Client API Repository
-Hyperledger Fabric Samples Repository
-
+## Key Citations
+- [Hyperledger Fabric v2.5 Documentation](https://hyperledger-fabric.readthedocs.io/en/release-2.5/)
+- [Fabric Gateway Client API Repository](https://github.com/hyperledger/fabric-gateway)
+- [Hyperledger Fabric Samples Repository](https://github.com/hyperledger/fabric-samples)
