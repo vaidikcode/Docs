@@ -153,14 +153,17 @@ The backend is a Go application using the Gin framework and the ICP agent for Go
 package main
 
 import (
+    "context"
     "crypto/sha256"
     "encoding/hex"
     "io"
     "net/http"
+    "net/url"
     "time"
 
     "github.com/aviate-labs/agent-go"
     "github.com/aviate-labs/agent-go/candid"
+    "github.com/aviate-labs/agent-go/identity"
     "github.com/aviate-labs/agent-go/principal"
     "github.com/gin-gonic/gin"
 )
@@ -172,18 +175,24 @@ type HashInfo struct {
 }
 
 func main() {
-    // Set up the ICP agent - uses default identity
+    // Parse the URL
+    hostURL, err := url.Parse("http://localhost:4943")
+    if err != nil {
+        panic(err)
+    }
+
+    // Set up the ICP agent config with identity inside the config
     config := agent.Config{
-        FetchRootKey: true, // Set to false in production
-        Host:         "http://localhost:4943", // Local replica
-        // For production: "https://ic0.app"
+        // Identity is part of the config struct, not a separate parameter
+        Identity:     new(identity.AnonymousIdentity),
+        FetchRootKey: true,
+        ClientConfig: []agent.ClientOption{
+            agent.WithHostURL(hostURL), // Use WithHostURL, not Host
+        },
     }
     
-    // For local development, we can use anonymous identity
-    identity := agent.AnonymousIdentity{}
-    
-    // Create agent
-    agent, err := agent.New(identity, config)
+    // Create agent with just the config
+    icAgent, err := agent.New(config)
     if err != nil {
         panic(err)
     }
@@ -231,11 +240,19 @@ func main() {
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
         defer cancel()
         
-        _, err = agent.UpdateCall(ctx, canisterID, "register_hash", []interface{}{hashStr})
+        // Using the CreateCandidAPIRequest method for update calls
+        req, err := icAgent.CreateCandidAPIRequest(agent.RequestTypeCall, canisterID, "register_hash", hashStr)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request: " + err.Error()})
+            return
+        }
+        
+        _, err = req.Call(ctx)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register hash: " + err.Error()})
             return
         }
+        
         c.JSON(http.StatusOK, gin.H{"message": "Hash registered successfully", "hash": hashStr})
     })
 
@@ -253,30 +270,38 @@ func main() {
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
         defer cancel()
         
-        response, err := agent.QueryCall(ctx, canisterID, "get_hash_info", []interface{}{req.Hash})
+        // Using the CreateCandidAPIRequest method for query calls
+        apiReq, err := icAgent.CreateCandidAPIRequest(agent.RequestTypeQuery, canisterID, "get_hash_info", req.Hash)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request: " + err.Error()})
+            return
+        }
+        
+        response, err := apiReq.Query(ctx)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve hash info: " + err.Error()})
             return
         }
-
-        // Parse the response - in aviate-labs/agent-go we need to handle the optional value
+        
+        // Parse the response - handling the optional value
         var result []HashInfo
-        _, err = candid.Decode(response, &result)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode response: " + err.Error()})
+        if response == nil || len(response) == 0 {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Hash not found"})
             return
         }
         
-        // Check if we got a result (optional type handling)
-        if len(result) == 0 {
-            c.JSON(http.StatusNotFound, gin.H{"error": "Hash not found"})
+        // First element will be the result
+        result0 := response[0]
+        hashInfo, ok := result0.(HashInfo)
+        if !ok {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse response"})
             return
         }
         
         // Return the result
         c.JSON(http.StatusOK, gin.H{
-            "user":      result[0].User.String(),
-            "timestamp": result[0].Timestamp,
+            "user":      hashInfo.User.String(),
+            "timestamp": hashInfo.Timestamp,
         })
     })
 
