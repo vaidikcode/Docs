@@ -153,36 +153,61 @@ The backend is a Go application using the Gin framework and the ICP agent for Go
 package main
 
 import (
-    "context"
     "crypto/sha256"
     "encoding/hex"
     "io"
     "net/http"
+    "time"
 
-    "github.com/dfinity/internetcomputer-go/agent"
-    "github.com/dfinity/internetcomputer-go/agent/auth"
-    "github.com/dfinity/internetcomputer-go/candid"
+    "github.com/aviate-labs/agent-go"
+    "github.com/aviate-labs/agent-go/candid"
+    "github.com/aviate-labs/agent-go/principal"
     "github.com/gin-gonic/gin"
 )
 
-// Define the HashInfo structure
+// Define the HashInfo structure matching your Rust canister
 type HashInfo struct {
-    User      string `candid:"user"`
-    Timestamp uint64 `candid:"timestamp"`
+    User      principal.Principal `ic:"user"`
+    Timestamp uint64              `ic:"timestamp"`
 }
 
 func main() {
-    // Set up the ICP agent
-    a, err := agent.New(agent.WithIdentity(auth.DefaultIdentity))
+    // Set up the ICP agent - uses default identity
+    config := agent.Config{
+        FetchRootKey: true, // Set to false in production
+        Host:         "http://localhost:4943", // Local replica
+        // For production: "https://ic0.app"
+    }
+    
+    // For local development, we can use anonymous identity
+    identity := agent.AnonymousIdentity{}
+    
+    // Create agent
+    agent, err := agent.New(identity, config)
     if err != nil {
         panic(err)
     }
 
-    // Replace with actual canister ID
-    canisterId := "ryjl3-tyaaa-aaaaa-aaaba-cai"
+    // Replace with your actual canister ID
+    canisterID, err := principal.Decode("uxrrr-q7777-77774-qaaaq-cai") // Your deployed canister ID
+    if err != nil {
+        panic(err)
+    }
 
     // Set up Gin router
     r := gin.Default()
+
+    // Enable CORS
+    r.Use(func(c *gin.Context) {
+        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+        c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+        c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+        c.Next()
+    })
 
     // Endpoint to register a hash
     r.POST("/register", func(c *gin.Context) {
@@ -203,12 +228,15 @@ func main() {
         hashStr := hex.EncodeToString(hash.Sum(nil))
 
         // Call canister to register hash
-        _, err = a.Update(canisterId, "register_hash", candid.EncodeOrPanic(hashStr))
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+        
+        _, err = agent.UpdateCall(ctx, canisterID, "register_hash", []interface{}{hashStr})
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register hash"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register hash: " + err.Error()})
             return
         }
-        c.JSON(http.StatusOK, gin.H{"message": "Hash registered successfully"})
+        c.JSON(http.StatusOK, gin.H{"message": "Hash registered successfully", "hash": hashStr})
     })
 
     // Endpoint to verify a hash
@@ -222,13 +250,34 @@ func main() {
         }
 
         // Call canister to get hash info
-        var result HashInfo
-        err := a.Query(canisterId, "get_hash_info", candid.EncodeOrPanic(req.Hash), &result)
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+        
+        response, err := agent.QueryCall(ctx, canisterID, "get_hash_info", []interface{}{req.Hash})
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve hash info"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve hash info: " + err.Error()})
             return
         }
-        c.JSON(http.StatusOK, result)
+
+        // Parse the response - in aviate-labs/agent-go we need to handle the optional value
+        var result []HashInfo
+        _, err = candid.Decode(response, &result)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode response: " + err.Error()})
+            return
+        }
+        
+        // Check if we got a result (optional type handling)
+        if len(result) == 0 {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Hash not found"})
+            return
+        }
+        
+        // Return the result
+        c.JSON(http.StatusOK, gin.H{
+            "user":      result[0].User.String(),
+            "timestamp": result[0].Timestamp,
+        })
     })
 
     // Run the server
