@@ -1,336 +1,275 @@
-# ProofNest Implementation on ICP Blockchain
+## Micro-Contract Generator for Informal Gigs: End-to-End Implementation
 
-## Introduction
+This document provides a comprehensive implementation of the Micro-Contract Generator, a web application designed to empower informal gig workers by simplifying the creation of legally sound contracts, enabling electronic signatures, and offering dispute resolution through a chatbot. The solution uses **React** for the frontend, **Go** for the backend, **MongoDB** for contract storage, **DocuSign** for e-signatures, and **Dialogflow** for the chatbot. The implementation ensures contracts are written in plain language using basic text formatting, with the potential for advanced NLP integration.
 
-ProofNest is a decentralized platform designed to help creators prove ownership of digital content, such as documents, code, designs, or ideas, by registering a hash of the content on the Internet Computer Protocol (ICP) blockchain. This implementation replaces the original Hyperledger Fabric-based system with ICP, leveraging its scalable and decentralized architecture. The system uses Rust for the canister (ICP’s smart contract), Go for the backend, and React.js for the frontend, aligning with the user’s proficiency in Go.
+### Overview
 
-## System Architecture
+Informal gig workers, such as dog walkers, tutors, or freelancers, often face challenges due to the lack of quick, legally binding agreements, leading to disputes or unpaid work. The Micro-Contract Generator addresses this by providing a web-based platform where users can:
+- Generate customizable contracts based on inputs like task, pay, and timeline.
+- Sign contracts electronically using DocuSign.
+- Resolve disputes via a Dialogflow-powered chatbot.
+- Store contracts securely in MongoDB.
 
-ProofNest consists of three main components:
+The application is unique in its use of AI-driven clarity (via simple text formatting, with room for NLP enhancements) and its focus on informal work. It empowers gig workers, builds trust, and reduces financial risks.
 
-- **Canister (Rust)**: A smart contract on ICP that stores and retrieves hash information (hash, user identity, timestamp).
-- **Backend (Go)**: An API server that handles user requests, computes SHA-256 hashes, and interacts with the canister using the ICP agent for Go.
-- **Frontend (React.js)**: A user interface for uploading files or text, computing hashes, and verifying ownership.
+### Tech Stack
 
-The system uses SHA-256 hashing to ensure content privacy, storing only hashes on-chain, not the original files or text.
+| Component       | Technology                     | Purpose                              |
+|-----------------|-------------------------------|--------------------------------------|
+| Frontend        | React, Tailwind CSS, Axios    | User interface for contract creation, signing, and chatbot interaction |
+| Backend         | Go (Gin framework)            | RESTful API for business logic       |
+| Database        | MongoDB                       | Contract and user data storage       |
+| E-Signature     | DocuSign API (via esign)       | Electronic signature functionality   |
+| Chatbot         | Dialogflow                    | Dispute resolution via NLP           |
 
-## Prerequisites
+### Backend Implementation (Go)
 
-Before implementing ProofNest, ensure you have:
+The backend is built using Go with the [Gin framework](https://github.com/gin-gonic/gin) for handling HTTP requests. It integrates [MongoDB](https://www.mongodb.com/) for data storage, [DocuSign](https://developers.docusign.com/) for e-signatures via the [esign library](https://github.com/jfcote87/esign), and [Dialogflow](https://cloud.google.com/dialogflow) for the chatbot.
 
-- **IC SDK**: For deploying canisters (Install IC SDK).
-- **Rust (1.64+)**: For canister development (Rust Installation).
-- **Go (1.16+)**: For backend development (Go Installation).
-- **Node.js (16+)**: For the React frontend (Node.js Installation).
-- **dfx**: The ICP command-line tool, included with the IC SDK.
-
-## Setting Up the Development Environment
-
-1. **Install the IC SDK**:
-
-   ```bash
-   sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
-   ```
-
-   Verify installation:
-
-   ```bash
-   dfx --version
-   ```
-
-2. **Set Up a Local ICP Network**:
-
-   ```bash
-   dfx start --clean
-   ```
-
-3. **Create a New dfx Project**:
-
-   ```bash
-   dfx new proofnest
-   cd proofnest
-   ```
-
-## Canister Development (Rust)
-
-The canister, written in Rust, manages hash registration and verification. It includes two functions:
-
-- `register_hash`: Stores a hash with the caller’s identity and timestamp, ensuring uniqueness.
-- `get_hash_info`: Retrieves the owner and timestamp for a given hash.
-
-### Canister Code
-
-```rust
-use ic_cdk::export::{
-    candid::{CandidType, Deserialize},
-    Principal,
-};
-use ic_cdk_macros::*;
-use std::cell::RefCell;
-use std::collections::HashMap;
-
-// Define the structure for hash information
-#[derive(CandidType, Deserialize, Clone)]
-struct HashInfo {
-    user: Principal,
-    timestamp: u64,
-}
-
-// Use thread-local storage for the hash map
-thread_local! {
-    static HASH_MAP: RefCell<HashMap<String, HashInfo>> = RefCell::new(HashMap::new());
-}
-
-// Function to register a hash
-#[update]
-fn register_hash(hash: String) -> () {
-    let caller = ic_cdk::caller();
-    let timestamp = ic_cdk::api::time();
-    HASH_MAP.with(|map| {
-        let mut map = map.borrow_mut();
-        // Ensure the hash is unique
-        if map.contains_key(&hash) {
-            panic!("Hash already registered");
-        }
-        map.insert(hash.clone(), HashInfo { user: caller, timestamp });
-    });
-}
-
-// Function to retrieve hash information
-#[query]
-fn get_hash_info(hash: String) -> Option<HashInfo> {
-    HASH_MAP.with(|map| {
-        let map = map.borrow();
-        map.get(&hash).cloned()
-    })
-}
-
-// Define the canister's Candid interface
-#[export_candid]
-fn candid() -> String {
-    r#"
-    (service : {
-        register_hash : (hash: text) -> ();
-        get_hash_info : (hash: text) -> opt (record { user: principal; timestamp: nat64 });
-    })
-    "#
-    .to_string()
-}
-```
-
-### Deploying the Canister
-
-1. Place the Rust code in `src/proofnest_backend/src/lib.rs`.
-2. Update `dfx.json` to include the canister:
-
-   ```json
-   {
-     "canisters": {
-       "proofnest_backend": {
-         "main": "src/proofnest_backend/src/lib.rs",
-         "type": "rust"
-       }
-     }
-   }
-   ```
-3. Deploy the canister locally:
-
-   ```bash
-   dfx deploy
-   ```
-4. Note the canister ID for backend integration.
-
-## Backend Development (Go)
-
-The backend is a Go application using the Gin framework and the ICP agent for Go. It provides two endpoints:
-
-- `/register`: Registers a hash for a user.
-- `/verify`: Verifies ownership of a hash.
-
-### Backend Code
+#### Backend Code
 
 ```go
 package main
 
 import (
-    "context"
-    "crypto/sha256"
-    "encoding/hex"
-    "io"
-    "net/http"
-    "net/url"
-    "time"
+	"context"
+	"encoding/base64"
+	"log"
+	"net/http"
+	"os"
 
-    "github.com/aviate-labs/agent-go"
-    "github.com/aviate-labs/agent-go/candid"
-    "github.com/aviate-labs/agent-go/identity"
-    "github.com/aviate-labs/agent-go/principal"
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"cloud.google.com/go/dialogflow/apiv2"
+	dialogflowpb "cloud.google.com/go/dialogflow/apiv2/dialogflowpb"
+	"google.golang.org/api/option"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/jfcote87/esign"
 )
 
-// Define the HashInfo structure matching your Rust canister
-type HashInfo struct {
-    User      principal.Principal `ic:"user"`
-    Timestamp uint64              `ic:"timestamp"`
+// MongoDB connection
+var collection *mongo.Collection
+
+// Contract model
+type Contract struct {
+	ID          string      `bson:"_id,omitempty" json:"id"`
+	Title       string      `bson:"title" json:"title"`
+	Description string      `bson:"description" json:"description"`
+	Pay         float64     `bson:"pay" json:"pay"`
+	StartDate   string      `bson:"startDate" json:"startDate"`
+	EndDate     string      `bson:"endDate" json:"endDate"`
+	Parties     []Party     `bson:"parties" json:"parties"`
+	Status      string      `bson:"status" json:"status"`
+	Signatures  []Signature `bson:"signatures" json:"signatures"`
 }
 
+type Party struct {
+	Name  string `bson:"name" json:"name"`
+	Email string `bson:"email" json:"email"`
+}
+
+type Signature struct {
+	Party  string `bson:"party" json:"party"`
+	Signed bool   `bson:"signed" json:"signed"`
+}
+
+// DocuSign client
+var dsClient *esign.Client
+
+// Dialogflow client
+var dfClient *dialogflowpb.SessionsClient
+
 func main() {
-    // Parse the URL
-    hostURL, err := url.Parse("http://localhost:4943")
-    if err != nil {
-        panic(err)
-    }
+	// Connect to MongoDB
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+	collection = client.Database("gigContracts").Collection("contracts")
 
-    // Set up the ICP agent config with identity inside the config
-    config := agent.Config{
-        // Identity is part of the config struct, not a separate parameter
-        Identity:     new(identity.AnonymousIdentity),
-        FetchRootKey: true,
-        ClientConfig: []agent.ClientOption{
-            agent.WithHostURL(hostURL), // Use WithHostURL, not Host
-        },
-    }
-    
-    // Create agent with just the config
-    icAgent, err := agent.New(config)
-    if err != nil {
-        panic(err)
-    }
+	// Initialize DocuSign client
+	integrationKey := os.Getenv("DS_INTEGRATION_KEY")
+	userId := os.Getenv("DS_USER_ID")
+	rsaKey := os.Getenv("DS_RSA_KEY")
+	dsClient, err = esign.New(integrationKey, userId, rsaKey)
+	if err != nil {
+		log.Fatalf("Failed to initialize DocuSign client: %v", err)
+	}
 
-    // Replace with your actual canister ID
-    canisterID, err := principal.Decode("uxrrr-q7777-77774-qaaaq-cai") // Your deployed canister ID
-    if err != nil {
-        panic(err)
-    }
+	// Initialize Dialogflow client
+	ctx := context.Background()
+	dfClient, err = dialogflowpb.NewSessionsClient(ctx, option.WithCredentialsFile("path/to/service-account.json"))
+	if err != nil {
+		log.Fatalf("Failed to create Dialogflow client: %v", err)
+	}
 
-    // Set up Gin router
-    r := gin.Default()
+	// Set up Gin router
+	r := gin.Default()
+	r.POST("/contracts", createContract)
+	r.GET("/contracts", getContracts)
+	r.GET("/contracts/:id", getContract)
+	r.POST("/contracts/:id/sign", signContract)
+	r.POST("/chatbot", chatbotHandler)
 
-    // Enable CORS
-    r.Use(func(c *gin.Context) {
-        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-        c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-        c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
-        if c.Request.Method == "OPTIONS" {
-            c.AbortWithStatus(204)
-            return
-        }
-        c.Next()
-    })
+	r.Run(":8080")
+}
 
-    // Endpoint to register a hash
-    r.POST("/register", func(c *gin.Context) {
-        // Read file or text from request
-        file, _, err := c.Request.FormFile("file")
-        if err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read file"})
-            return
-        }
-        defer file.Close()
+// Create a new contract
+func createContract(c *gin.Context) {
+	var contract Contract
+	if err := c.ShouldBindJSON(&contract); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	contract.ID = generateID()
+	contract.Status = "draft"
+	_, err := collection.InsertOne(context.TODO(), contract)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, contract)
+}
 
-        // Compute SHA-256 hash
-        hash := sha256.New()
-        if _, err := io.Copy(hash, file); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute hash"})
-            return
-        }
-        hashStr := hex.EncodeToString(hash.Sum(nil))
+// Get all contracts
+func getContracts(c *gin.Context) {
+	cursor, err := collection.Find(context.TODO(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var contracts []Contract
+	if err = cursor.All(context.TODO(), &contracts); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, contracts)
+}
 
-        // Call canister to register hash
-        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-        defer cancel()
-        
-        // Using the CreateCandidAPIRequest method for update calls
-        req, err := icAgent.CreateCandidAPIRequest(agent.RequestTypeCall, canisterID, "register_hash", hashStr)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request: " + err.Error()})
-            return
-        }
-        
-        _, err = req.Call(ctx)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register hash: " + err.Error()})
-            return
-        }
-        
-        c.JSON(http.StatusOK, gin.H{"message": "Hash registered successfully", "hash": hashStr})
-    })
+// Get a specific contract
+func getContract(c *gin.Context) {
+	id := c.Param("id")
+	var contract Contract
+	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&contract)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
+		return
+	}
+	c.JSON(http.StatusOK, contract)
+}
 
-    // Endpoint to verify a hash
-    r.POST("/verify", func(c *gin.Context) {
-        var req struct {
-            Hash string `json:"hash"`
-        }
-        if err := c.BindJSON(&req); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-            return
-        }
+// Initiate signing with DocuSign
+func signContract(c *gin.Context) {
+	id := c.Param("id")
+	var contract Contract
+	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&contract)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
+		return
+	}
 
-        // Call canister to get hash info
-        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-        defer cancel()
-        
-        // Using the CreateCandidAPIRequest method for query calls
-        apiReq, err := icAgent.CreateCandidAPIRequest(agent.RequestTypeQuery, canisterID, "get_hash_info", req.Hash)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request: " + err.Error()})
-            return
-        }
-        
-        response, err := apiReq.Query(ctx)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve hash info: " + err.Error()})
-            return
-        }
-        
-        // Parse the response - handling the optional value
-        var result []HashInfo
-        if response == nil || len(response) == 0 {
-            c.JSON(http.StatusNotFound, gin.H{"error": "Hash not found"})
-            return
-        }
-        
-        // First element will be the result
-        result0 := response[0]
-        hashInfo, ok := result0.(HashInfo)
-        if !ok {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse response"})
-            return
-        }
-        
-        // Return the result
-        c.JSON(http.StatusOK, gin.H{
-            "user":      hashInfo.User.String(),
-            "timestamp": hashInfo.Timestamp,
-        })
-    })
+	// Generate PDF (placeholder)
+	pdfContent := []byte("Contract PDF content") // Replace with actual PDF generation
+	pdfBase64 := base64.StdEncoding.EncodeToString(pdfContent)
 
-    // Run the server
-    r.Run(":8080")
+	// Create DocuSign envelope
+	envelope := esign.EnvelopeDefinition{
+		EmailSubject: "Sign your contract",
+		Status:       "sent",
+		Documents: []esign.Document{
+			{
+				Name:           "contract.pdf",
+				DocumentID:     "1",
+				DocumentBase64: pdfBase64,
+			},
+		},
+		Recipients: esign.Recipients{
+			Signers: []esign.Signer{
+				{
+					Name:        contract.Parties[0].Name,
+					Email:       contract.Parties[0].Email,
+					RecipientID: "1",
+					Tabs: esign.Tabs{
+						SignHereTabs: []esign.SignHere{
+							{
+								DocumentID: "1",
+								PageNumber: "1",
+								XPosition:  "100",
+								YPosition:  "100",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Send envelope
+	envelopeSummary, err := dsClient.Envelopes.Send(contract.ID, envelope)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Envelope sent", "envelopeId": envelopeSummary.EnvelopeID})
+}
+
+// Chatbot handler
+func chatbotHandler(c *gin.Context) {
+	var request struct {
+		Message string `json:"message"`
+		Session string `json:"session"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+	req := dialogflowpb.DetectIntentRequest{
+		Session: request.Session,
+		QueryInput: &dialogflowpb.QueryInput{
+			Text: &dialogflowpb.TextInput{
+				Text:         request.Message,
+				LanguageCode: "en-US",
+			},
+		},
+	}
+	response, err := dfClient.DetectIntent(ctx, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"response": response.QueryResult.FulfillmentText})
+}
+
+// Helper function to generate ID (placeholder)
+func generateID() string {
+	return "contract-" + string(rune(time.Now().UnixNano())) // Simple ID generation
 }
 ```
 
-### Setup Instructions
+#### Backend Features
+- **Contract Creation**: Accepts JSON input to create contracts, stored in MongoDB with a unique ID and "draft" status.
+- **Contract Retrieval**: Provides endpoints to list all contracts or fetch a specific contract by ID.
+- **E-Signature**: Integrates with DocuSign to send contracts for signing, using a placeholder PDF (requires actual PDF generation for production).
+- **Chatbot**: Processes user messages via Dialogflow, detecting intents and returning responses for dispute resolution.
+- **MongoDB Schema**: Stores contracts with fields for title, description, pay, dates, parties, status, and signatures.
 
-1. Install dependencies:
+#### Setup Requirements
+- Install Go dependencies: `go get github.com/gin-gonic/gin go.mongodb.org/mongo-driver cloud.google.com/go/dialogflow/apiv2 github.com/jfcote87/esign`.
+- Set environment variables for DocuSign (`DS_INTEGRATION_KEY`, `DS_USER_ID`, `DS_RSA_KEY`) and Dialogflow (service account JSON file).
+- Run MongoDB locally or on a cloud instance (`mongodb://localhost:27017`).
+- Start the backend: `go run main.go`.
 
-   ```bash
-   go get github.com/gin-gonic/gin
-   go get github.com/dfinity/internetcomputer-go/agent
-   go get github.com/dfinity/internetcomputer-go/candid
-   ```
-2. Update `canisterId` with the actual ID from the deployed canister.
-3. Run the backend:
+### Frontend Implementation (React)
 
-   ```bash
-   go run main.go
-   ```
+The frontend is a single-page React application styled with [Tailwind CSS](https://tailwindcss.com/) and uses [Axios](https://axios-http.com/) for API calls. It provides interfaces for contract creation, viewing, signing, and chatbot interaction.
 
-## Frontend Development (React.js)
-
-The frontend is a React.js single-page application that allows users to register and verify hashes. It uses the Web Crypto API for SHA-256 hashing and Axios for API requests.
-
-### Frontend Code
+#### Frontend Code
 
 ```html
 <!DOCTYPE html>
@@ -338,7 +277,7 @@ The frontend is a React.js single-page application that allows users to register
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProofNest</title>
+  <title>Micro-Contract Generator</title>
   <script src="https://cdn.jsdelivr.net/npm/react@17/umd/react.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@17/umd/react-dom.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -348,147 +287,245 @@ The frontend is a React.js single-page application that allows users to register
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState } = React;
+    const { useState, useEffect } = React;
 
     const App = () => {
-      const [activeTab, setActiveTab] = useState('register');
+      const [contracts, setContracts] = useState([]);
+      const [showChatbot, setShowChatbot] = useState(false);
+      const [messages, setMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState('');
+
+      useEffect(() => {
+        fetchContracts();
+      }, []);
+
+      const fetchContracts = async () => {
+        try {
+          const response = await axios.get('http://localhost:8080/contracts');
+          setContracts(response.data);
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      const handleCreateContract = async (contract) => {
+        try {
+          await axios.post('http://localhost:8080/contracts', contract);
+          fetchContracts();
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      const handleSignContract = async (id) => {
+        try {
+          await axios.post(`http://localhost:8080/contracts/${id}/sign`);
+          alert('Signing initiated');
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      const handleSendMessage = async () => {
+        if (newMessage.trim() === '') return;
+        setMessages([...messages, { text: newMessage, sender: 'user' }]);
+        try {
+          const response = await axios.post('http://localhost:8080/chatbot', {
+            message: newMessage,
+            session: 'projects/your-project-id/agent/sessions/some-session-id',
+          });
+          setMessages((prev) => [...prev, { text: response.data.response, sender: 'bot' }]);
+        } catch (error) {
+          console.error(error);
+        }
+        setNewMessage('');
+      };
 
       return (
         <div className="container mx-auto p-4">
-          <h1 className="text-3xl font-bold mb-4">ProofNest</h1>
-          <div className="tabs mb-4">
+          <h1 className="text-2xl font-bold mb-4">Micro-Contract Generator</h1>
+          <ContractForm onSubmit={handleCreateContract} />
+          <h2 className="text-xl font-semibold mt-6 mb-2">Contracts</h2>
+          <ul className="list-disc pl-5">
+            {contracts.map((contract) => (
+              <li key={contract.id} className="mb-2">
+                {contract.title} - {contract.status}
+                <button
+                  onClick={() => handleSignContract(contract.id)}
+                  className="ml-4 bg-blue-500 text-white px-2 py-1 rounded"
+                >
+                  Sign
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => setShowChatbot(!showChatbot)}
+            className="mt-4 bg-green-500 text-white px-4 py-2 rounded"
+          >
+            {showChatbot ? 'Close Chatbot' : 'Open Chatbot'}
+          </button>
+          {showChatbot && (
+            <Chatbot
+              messages={messages}
+              onSend={handleSendMessage}
+              newMessage={newMessage}
+              setNewMessage={setNewMessage}
+            />
+          )}
+        </div>
+      );
+    };
+
+    const ContractForm = ({ onSubmit }) => {
+      const [title, setTitle] = useState('');
+      const [description, setDescription] = useState('');
+      const [pay, setPay] = useState(0);
+      const [startDate, setStartDate] = useState('');
+      const [endDate, setEndDate] = useState('');
+      const [parties, setParties] = useState([{ name: '', email: '' }]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const contract = {
+          title,
+          description,
+          pay: parseFloat(pay),
+          startDate,
+          endDate,
+          parties,
+          signatures: parties.map((party) => ({ party: party.name, signed: false })),
+        };
+        onSubmit(contract);
+        setTitle('');
+        setDescription('');
+        setPay(0);
+        setStartDate('');
+        setEndDate('');
+        setParties([{ name: '', email: '' }]);
+      };
+
+      const addParty = () => {
+        setParties([...parties, { name: '', email: '' }]);
+      };
+
+      return (
+        <div className="bg-gray-100 p-4 rounded">
+          <h2 className="text-xl font-semibold mb-2">Create Contract</h2>
+          <div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description"
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <input
+              type="number"
+              value={pay}
+              onChange={(e) => setPay(e.target.value)}
+              placeholder="Pay"
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full p-2 mb-2 border rounded"
+            />
+            {parties.map((party, index) => (
+              <div key={index} className="flex mb-2">
+                <input
+                  type="text"
+                  value={party.name}
+                  onChange={(e) => {
+                    const newParties = [...parties];
+                    newParties[index].name = e.target.value;
+                    setParties(newParties);
+                  }}
+                  placeholder="Party Name"
+                  className="w-1/2 p-2 mr-2 border rounded"
+                />
+                <input
+                  type="email"
+                  value={party.email}
+                  onChange={(e) => {
+                    const newParties = [...parties];
+                    newParties[index].email = e.target.value;
+                    setParties(newParties);
+                  }}
+                  placeholder="Party Email"
+                  className="w-1/2 p-2 border rounded"
+                />
+              </div>
+            ))}
             <button
-              className={`px-4 py-2 ${activeTab === 'register' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-              onClick={() => setActiveTab('register')}
+              type="button"
+              onClick={addParty}
+              className="bg-gray-500 text-white px-2 py-1 rounded mb-2"
             >
-              Register
+              Add Party
             </button>
             <button
-              className={`px-4 py-2 ${activeTab === 'verify' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-              onClick={() => setActiveTab('verify')}
+              type="submit"
+              onClick={handleSubmit}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
             >
-              Verify
+              Create Contract
             </button>
           </div>
-          {activeTab === 'register' ? <Register /> : <Verify />}
         </div>
       );
     };
 
-    const Register = () => {
-      const [username, setUsername] = useState('');
-      const [text, setText] = useState('');
-      const [file, setFile] = useState(null);
-      const [message, setMessage] = useState('');
-
-      const computeHash = async (data) => {
-        const encoder = new TextEncoder();
-        const dataBuffer = encoder.encode(data);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        return hashHex;
-      };
-
-      const handleRegister = async () => {
-        let data;
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-            data = event.target.result;
-            const hash = await computeHash(data);
-            sendRegisterRequest(hash);
-          };
-          reader.readAsText(file);
-        } else {
-          data = text;
-          const hash = await computeHash(data);
-          sendRegisterRequest(hash);
-        }
-      };
-
-      const sendRegisterRequest = async (hash) => {
-        try {
-          const response = await axios.post('http://localhost:8080/register', { username, hash });
-          setMessage(response.data.status);
-        } catch (error) {
-          setMessage('Error: ' + (error.response?.data?.error || 'Unknown error'));
-        }
-      };
-
+    const Chatbot = ({ messages, onSend, newMessage, setNewMessage }) => {
       return (
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-2xl mb-4">Register Hash</h2>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="border p-2 mb-4 w-full"
-          />
-          <textarea
-            placeholder="Text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="border p-2 mb-4 w-full"
-          ></textarea>
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="mb-4"
-          />
-          <button
-            onClick={handleRegister}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Register
-          </button>
-          <p className="mt-4">{message}</p>
-        </div>
-      );
-    };
-
-    const Verify = () => {
-      const [hash, setHash] = useState('');
-      const [result, setResult] = useState(null);
-
-      const handleVerify = async () => {
-        try {
-          const response = await axios.post('http://localhost:8080/verify', { hash });
-          setResult(response.data);
-        } catch (error) {
-          setResult({ error: error.response?.data?.error || 'Unknown error' });
-        }
-      };
-
-      return (
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-2xl mb-4">Verify Hash</h2>
-          <input
-            type="text"
-            placeholder="Hash"
-            value={hash}
-            onChange={(e) => setHash(e.target.value)}
-            className="border p-2 mb-4 w-full"
-          />
-          <button
-            onClick={handleVerify}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Verify
-          </button>
-          {result && (
-            <div className="mt-4">
-              {result.error ? (
-                <p>Error: {result.error}</p>
-              ) : (
-                <div>
-                  <p>User: {result.user}</p>
-                  <p>Timestamp: {result.timestamp}</p>
-                </div>
-              )}
-            </div>
-          )}
+        <div className="mt-4 bg-gray-100 p-4 rounded">
+          <h2 className="text-xl font-semibold mb-2">Dispute Resolution Chatbot</h2>
+          <div className="h-64 overflow-y-auto border p-2 mb-2">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`mb-2 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
+              >
+                <span
+                  className={`inline-block p-2 rounded ${
+                    msg.sender === 'user' ? 'bg-blue-200' : 'bg-gray-200'
+                  }`}
+                >
+                  {msg.text}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && onSend()}
+              placeholder="Type your message..."
+              className="w-full p-2 border rounded"
+            />
+            <button
+              onClick={onSend}
+              className="ml-2 bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Send
+            </button>
+          </div>
         </div>
       );
     };
@@ -499,49 +536,103 @@ The frontend is a React.js single-page application that allows users to register
 </html>
 ```
 
+#### Frontend Features
+- **Contract Creation Form**: Allows users to input gig details (title, description, pay, dates, parties) and submit to create a contract.
+- **Contract List**: Displays all contracts with their titles and statuses, with a button to initiate signing.
+- **E-Signature**: Triggers the signing process by calling the backend's `/contracts/:id/sign` endpoint.
+- **Chatbot Interface**: Provides a chat window for dispute resolution, sending messages to the backend for Dialogflow processing.
+- **Styling**: Uses Tailwind CSS for a responsive, modern design.
+
+#### Setup Requirements
+- Save the HTML file and open it in a browser (ensure the backend is running at `http://localhost:8080`).
+- The app uses CDN-hosted React, Axios, and Tailwind CSS, so no additional installation is required.
+- Update the Dialogflow session ID in the chatbot API call to match your Dialogflow project.
+
+### Database (MongoDB)
+
+MongoDB stores contracts in the `gigContracts` database, `contracts` collection. The schema is:
+
+```json
+{
+  "_id": "contract-123",
+  "title": "Dog Walking Gig",
+  "description": "Walk client's dog twice daily",
+  "pay": 100.0,
+  "startDate": "2025-04-25",
+  "endDate": "2025-04-30",
+  "parties": [
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"}
+  ],
+  "status": "draft",
+  "signatures": [
+    {"party": "Alice", "signed": false},
+    {"party": "Bob", "signed": false}
+  ]
+}
+```
+
+#### Setup
+- Install MongoDB locally or use a cloud service like [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+- Ensure the MongoDB URI in the backend code matches your setup.
+
+### Integrations
+
+#### DocuSign
+The backend uses the [esign library](https://github.com/jfcote87/esign) to interact with DocuSign's eSignature API. It creates an envelope with a placeholder PDF and sends it to the contract parties for signing.
+
+**Setup**:
+- Create a DocuSign developer account at [DocuSign Developer](https://developers.docusign.com/).
+- Generate an integration key, user ID, and RSA private key.
+- Set these as environment variables in the backend.
+
+**Note**: The current implementation uses a placeholder PDF. For production, integrate a PDF generation library like [gopdf](https://github.com/signintech/gopdf) to create contract PDFs.
+
+#### Dialogflow
+The chatbot uses Dialogflow's [Go client library](https://pkg.go.dev/cloud.google.com/go/dialogflow/apiv2) to detect intents and provide responses for dispute resolution.
+
+**Setup**:
+- Create a Dialogflow agent at [Dialogflow Console](https://dialogflow.cloud.google.com/).
+- Set up intents for dispute resolution (e.g., "payment issue", "task not completed").
+- Download a service account JSON key and specify its path in the backend code.
+- Update the session ID in the frontend to match your Dialogflow project.
+
+### Plain Language (NLP)
+To ensure contracts are clear and simple, the implementation relies on user-provided inputs formatted into a straightforward structure. For advanced NLP, you could integrate a library like [TextRazor](https://www.textrazor.com/) or [Google Cloud Natural Language](https://cloud.google.com/natural-language) to analyze and simplify text, but this is not included in the current code.
+
 ### Setup Instructions
 
-1. Save the HTML file as `index.html`.
-2. Serve it using a static file server (e.g., `npx serve`).
-3. Ensure the backend is running at `http://localhost:8080`.
+1. **Backend**:
+   - Install Go: [Download Go](https://go.dev/dl/).
+   - Install dependencies: `go get github.com/gin-gonic/gin go.mongodb.org/mongo-driver cloud.google.com/go/dialogflow/apiv2 github.com/jfcote87/esign`.
+   - Configure environment variables for DocuSign and Dialogflow.
+   - Run MongoDB locally or via a cloud service.
+   - Start the backend: `go run main.go`.
 
-## Cloud-Native Enhancements
+2. **Frontend**:
+   - Save the provided HTML file as `index.html`.
+   - Open it in a browser with the backend running.
+   - Ensure CORS is enabled in the backend if running on different ports (add `r.Use(cors.Default())` with `github.com/gin-contrib/cors`).
 
-To make ProofNest cloud-native, consider:
+3. **Database**:
+   - Set up MongoDB with the `gigContracts` database and `contracts` collection.
+   - Verify the MongoDB URI in the backend code.
 
-- **Containerization**: Package the backend and frontend in Docker containers.
-- **Orchestration**: Deploy using Kubernetes for scalability.
-- **CI/CD**: Set up pipelines with GitHub Actions for automated testing and deployment.
+4. **Integrations**:
+   - Configure DocuSign and Dialogflow as described above.
+   - Test the e-signature and chatbot functionalities.
 
-### Example Docker Configuration
+### Enhancements for Production
+- **User Authentication**: Add JWT-based authentication to secure user data.
+- **PDF Generation**: Use a library like [gopdf](https://github.com/signintech/gopdf) to generate contract PDFs.
+- **Advanced NLP**: Integrate an NLP service to enhance contract clarity.
+- **Session Management**: Implement proper session handling for the Dialogflow chatbot.
+- **Error Handling**: Add robust error logging and user-friendly error messages.
+- **HTTPS**: Use HTTPS for secure communication in production.
 
-| Component | Dockerfile Example |
-| --- | --- |
-| Backend | `FROM golang:1.16`<br>`WORKDIR /app`<br>`COPY . .`<br>`RUN go build -o main`<br>`CMD ["./main"]` |
-| Frontend | `FROM node:16`<br>`WORKDIR /app`<br>`COPY . .`<br>`RUN npm install`<br>`CMD ["npx", "serve"]` |
+### Impact
+The Micro-Contract Generator empowers gig workers by providing a tool to create legally sound agreements quickly, reducing the risk of disputes and unpaid work. The integration of e-signatures builds trust, while the chatbot offers a convenient way to mediate issues. By focusing on plain language, the app ensures accessibility for users without legal expertise.
 
-## Security Considerations
-
-- **Identity Management**: Securely manage user identities using ICP’s Internet Identity or similar services.
-- **Input Validation**: Validate all inputs to prevent injection attacks.
-- **Canister Upgrades**: Plan for canister upgrades to maintain state (Canister Upgrades).
-
-## Limitations
-
-- **Go for Canisters**: Writing canisters in Go is experimental and not officially supported (Go Canister Efforts). Rust is used for stability.
-- **Scalability**: ICP’s subnet architecture supports scaling, but test thoroughly for high loads.
-- **Cost**: Canisters require cycles, which must be managed (ICP Cycles).
-
-## Conclusion
-
-This implementation provides a functional ProofNest platform on ICP, using Rust for the canister, Go for the backend, and React.js for the frontend. It allows users to register and verify ownership of digital content securely, with hashes stored on a decentralized blockchain. For production, enhance security, scalability, and cycle management as outlined.
-
-## Key Citations
-
-- Install the IC SDK for Canister Development
-- Rust Installation Guide for Developers
-- Go Installation Instructions
-- Node.js Download and Installation
-- Writing Smart Contracts on ICP in Go – A First Step
-- Canister Upgrades and Storage Persistence
-- ICP Overview and Cycles Management
+### Key Citations
+- [Gin Web Framework for Go](https://github.com/gin-gonic/gin)
+- [MongoDB Official Website
