@@ -1,638 +1,822 @@
-## Micro-Contract Generator for Informal Gigs: End-to-End Implementation
+# Second-Hand Product Verification System Implementation
 
-This document provides a comprehensive implementation of the Micro-Contract Generator, a web application designed to empower informal gig workers by simplifying the creation of legally sound contracts, enabling electronic signatures, and offering dispute resolution through a chatbot. The solution uses **React** for the frontend, **Go** for the backend, **MongoDB** for contract storage, **DocuSign** for e-signatures, and **Dialogflow** for the chatbot. The implementation ensures contracts are written in plain language using basic text formatting, with the potential for advanced NLP integration.
+This document provides a detailed implementation of a web platform to verify the background history, ownership, and details of second-hand products using Go (with Gin and Gorm) for the backend and React for the frontend. The system uses a centralized PostgreSQL database with hash chains for data integrity, avoiding blockchain complexity. It supports product registration, ownership transfer, event logging, history verification, and warranty management, with role-based access control.
 
-### Overview
+## Backend Implementation (Go with Gin and Gorm)
 
-Informal gig workers, such as dog walkers, tutors, or freelancers, often face challenges due to the lack of quick, legally binding agreements, leading to disputes or unpaid work. The Micro-Contract Generator addresses this by providing a web-based platform where users can:
-- Generate customizable contracts based on inputs like task, pay, and timeline.
-- Sign contracts electronically using DocuSign.
-- Resolve disputes via a Dialogflow-powered chatbot.
-- Store contracts securely in MongoDB.
+### Project Structure
+```
+backend/
+├── main.go
+├── models/
+│   ├── user.go
+│   ├── product.go
+│   ├── event.go
+│   ├── pending_transfer.go
+├── controllers/
+│   ├── user_controller.go
+│   ├── product_controller.go
+│   ├── event_controller.go
+├── middlewares/
+│   ├── auth.go
+├── utils/
+│   ├── hash.go
+├── go.mod
+```
 
-The application is unique in its use of AI-driven clarity (via simple text formatting, with room for NLP enhancements) and its focus on informal work. It empowers gig workers, builds trust, and reduces financial risks.
+### Database Setup
+Use PostgreSQL as the database. Install dependencies:
+```bash
+go get -u github.com/gin-gonic/gin
+go get -u gorm.io/gorm
+go get -u gorm.io/driver/postgres
+go get -u golang.org/x/crypto/bcrypt
+go get -u github.com/golang-jwt/jwt/v4
+```
 
-### Tech Stack
+### Database Models
+Define Gorm models for users, products, events, and pending transfers.
 
-| Component       | Technology                     | Purpose                              |
-|-----------------|-------------------------------|--------------------------------------|
-| Frontend        | React, Tailwind CSS, Axios    | User interface for contract creation, signing, and chatbot interaction |
-| Backend         | Go (Gin framework)            | RESTful API for business logic       |
-| Database        | MongoDB                       | Contract and user data storage       |
-| E-Signature     | DocuSign API (via esign)       | Electronic signature functionality   |
-| Chatbot         | Dialogflow                    | Dispute resolution via NLP           |
+**models/user.go**
+```go
+package models
 
-### Backend Implementation (Go)
+import "gorm.io/gorm"
 
-The backend is built using Go with the [Gin framework](https://github.com/gin-gonic/gin) for handling HTTP requests. It integrates [MongoDB](https://www.mongodb.com/) for data storage, [DocuSign](https://developers.docusign.com/) for e-signatures via the [esign library](https://github.com/jfcote87/esign), and [Dialogflow](https://cloud.google.com/dialogflow) for the chatbot.
+type User struct {
+    gorm.Model
+    Username     string `gorm:"unique"`
+    PasswordHash string
+    Role         string // regular, brand, repair_shop, admin
+}
+```
 
-#### Backend Code
+**models/product.go**
+```go
+package models
 
+import "gorm.io/gorm"
+
+type Product struct {
+    gorm.Model
+    SerialNumber  string `gorm:"unique"`
+    Manufacturer  string
+    Model         string
+}
+```
+
+**models/event.go**
+```go
+package models
+
+import "gorm.io/gorm"
+
+type Event struct {
+    gorm.Model
+    ProductID         uint
+    EventType        string // registration, ownership_transfer, repair, warranty_update
+    EventData        string // JSON or text
+    PreviousEventHash string
+    EventHash        string
+    CreatedBy        uint // User ID
+}
+```
+
+**models/pending_transfer.go**
+```go
+package models
+
+import "gorm.io/gorm"
+
+type PendingTransfer struct {
+    gorm.Model
+    ProductID   uint
+    NewOwnerID  uint
+}
+```
+
+### Utility Functions
+Implement a function to compute event hashes using SHA-256.
+
+**utils/hash.go**
+```go
+package utils
+
+import (
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+)
+
+type EventHashData struct {
+    ProductID         uint
+    EventType        string
+    EventData        string
+    CreatedAt        time.Time
+    CreatedBy        uint
+    PreviousEventHash string
+}
+
+func ComputeEventHash(data EventHashData) (string, error) {
+    jsonData, err := json.Marshal(data)
+    if err != nil {
+        return "", err
+    }
+    hash := sha256.Sum256(jsonData)
+    return hex.EncodeToString(hash[:]), nil
+}
+```
+
+### Authentication Middleware
+Implement JWT-based authentication.
+
+**middlewares/auth.go**
+```go
+package middlewares
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/golang-jwt/jwt/v4"
+    "net/http"
+    "strings"
+)
+
+var jwtSecret = []byte("your-secret-key")
+
+func AuthMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        authHeader := c.GetHeader("Authorization")
+        if authHeader == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+            c.Abort()
+            return
+        }
+
+        parts := strings.Split(authHeader, " ")
+        if len(parts) != 2 || parts[0] != "Bearer" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header"})
+            c.Abort()
+            return
+        }
+
+        token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
+            return jwtSecret, nil
+        })
+
+        if err != nil || !token.Valid {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+
+        claims, ok := token.Claims.(jwt.MapClaims)
+        if !ok {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+            c.Abort()
+            return
+        }
+
+        c.Set("user_id", uint(claims["user_id"].(float64)))
+        c.Set("role", claims["role"].(string))
+        c.Next()
+    }
+}
+```
+
+### API Controllers
+Implement handlers for user management, product operations, and event logging.
+
+**controllers/user_controller.go**
+```go
+package controllers
+
+import (
+    "github.com/gin-gonic/gin"
+    "golang.org/x/crypto/bcrypt"
+    "gorm.io/gorm"
+    "net/http"
+    "your_project/models"
+    "github.com/golang-jwt/jwt/v4"
+    "time"
+)
+
+var db *gorm.DB
+var jwtSecret = []byte("your-secret-key")
+
+func InitUserController(database *gorm.DB) {
+    db = database
+}
+
+type RegisterInput struct {
+    Username string `json:"username" binding:"required"`
+    Password string `json:"password" binding:"required"`
+    Role     string `json:"role" binding:"required"`
+}
+
+func RegisterUser(c *gin.Context) {
+    var input RegisterInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+        return
+    }
+
+    user := models.User{
+        Username:     input.Username,
+        PasswordHash: string(hash),
+        Role:         input.Role,
+    }
+
+    if err := db.Create(&user).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "User registered"})
+}
+
+type LoginInput struct {
+    Username string `json:"username" binding:"required"`
+    Password string `json:"password" binding:"required"`
+}
+
+func LoginUser(c *gin.Context) {
+    var input LoginInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    var user models.User
+    if err := db.Where("username = ?", input.Username).First(&user).Error; err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        return
+    }
+
+    if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        return
+    }
+
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "user_id": user.ID,
+        "role":    user.Role,
+        "exp":     time.Now().Add(time.Hour * 24).Unix(),
+    })
+
+    tokenString, err := token.SignedString(jwtSecret)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"token": tokenString})
+}
+```
+
+**controllers/product_controller.go**
+```go
+package controllers
+
+import (
+    "github.com/gin-gonic/gin"
+    "gorm.io/gorm"
+    "net/http"
+    "your_project/models"
+)
+
+func InitProductController(database *gorm.DB) {
+    db = database
+}
+
+type ProductInput struct {
+    SerialNumber string `json:"serial_number" binding:"required"`
+    Manufacturer string `json:"manufacturer" binding:"required"`
+    Model        string `json:"model" binding:"required"`
+}
+
+func RegisterProduct(c *gin.Context) {
+    role, _ := c.Get("role")
+    if role != "brand" {
+        c.JSON(http.StatusForbidden, gin.H{"error": "Only brands can register products"})
+        return
+    }
+
+    var input ProductInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    product := models.Product{
+        SerialNumber: input.SerialNumber,
+        Manufacturer: input.Manufacturer,
+        Model:        input.Model,
+    }
+
+    if err := db.Create(&product).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
+        return
+    }
+
+    userID, _ := c.Get("user_id")
+    event := models.Event{
+        ProductID:  product.ID,
+        EventType:  "registration",
+        EventData:  `{"details": "Product registered"}`,
+        CreatedBy:  userID.(uint),
+    }
+
+    if err := createEvent(&event); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log registration event"})
+        return
+    }
+
+    c.JSON(http.StatusOK, product)
+}
+
+func GetProduct(c *gin.Context) {
+    id := c.Param("id")
+    var product models.Product
+    if err := db.First(&product, id).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+        return
+    }
+
+    var events []models.Event
+    db.Where("product_id = ?", id).Order("created_at asc").Find(&events)
+
+    c.JSON(http.StatusOK, gin.H{
+        "product": product,
+        "history": events,
+    })
+}
+```
+
+**controllers/event_controller.go**
+```go
+package controllers
+
+import (
+    "encoding/json"
+    "github.com/gin-gonic/gin"
+    "gorm.io/gorm"
+    "net/http"
+    "your_project/models"
+    "your_project/utils"
+    "errors"
+)
+
+func InitEventController(database *gorm.DB) {
+    db = database
+}
+
+type EventInput struct {
+    EventType string `json:"event_type" binding:"required"`
+    EventData string `json:"event_data" binding:"required"`
+}
+
+func CreateEvent(c *gin.Context) {
+    productID := c.Param("id")
+    role, _ := c.Get("role")
+
+    var input EventInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    if input.EventType == "repair" && role != "repair_shop" {
+        c.JSON(http.StatusForbidden, gin.H{"error": "Only repair shops can log repairs"})
+        return
+    }
+
+    var lastEvent models.Event
+    err := db.Where("product_id = ?", productID).Order("created_at desc").First(&lastEvent).Error
+    previousHash := ""
+    if err != nil {
+        if !errors.Is(err, gorm.ErrRecordNotFound) {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+    } else {
+        previousHash = lastEvent.EventHash
+    }
+
+    userID, _ := c.Get("user_id")
+    event := models.Event{
+        ProductID:         productID,
+        EventType:        input.EventType,
+        EventData:        input.EventData,
+        PreviousEventHash: previousHash,
+        CreatedBy:        userID.(uint),
+    }
+
+    if err := db.Create(&event).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create event"})
+        return
+    }
+
+    hashData := utils.EventHashData{
+        ProductID:         event.ProductID,
+        EventType:        event.EventType,
+        EventData:        event.EventData,
+        CreatedAt:        event.CreatedAt,
+        CreatedBy:        event.CreatedBy,
+        PreviousEventHash: event.PreviousEventHash,
+    }
+
+    eventHash, err := utils.ComputeEventHash(hashData)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute hash"})
+        return
+    }
+
+    event.EventHash = eventHash
+    if err := db.Save(&event).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update event hash"})
+        return
+    }
+
+    c.JSON(http.StatusOK, event)
+}
+
+func VerifyProductHistory(c *gin.Context) {
+    productID := c.Param("id")
+    var events []models.Event
+    if err := db.Where("product_id = ?", productID).Order("created_at asc").Find(&events).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    for i, event := range events {
+        if i == 0 && event.PreviousEventHash != "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid previous hash for first event"})
+            return
+        } else if i > 0 && event.PreviousEventHash != events[i-1].EventHash {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Hash chain broken at event " + string(event.ID)})
+            return
+        }
+
+        hashData := utils.EventHashData{
+            ProductID:         event.ProductID,
+            EventType:        event.EventType,
+            EventData:        event.EventData,
+            CreatedAt:        event.CreatedAt,
+            CreatedBy:        event.CreatedBy,
+            PreviousEventHash: event.PreviousEventHash,
+        }
+
+        expectedHash, err := utils.ComputeEventHash(hashData)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute hash"})
+            return
+        }
+
+        if event.EventHash != expectedHash {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hash for event " + string(event.ID)})
+            return
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "History is valid"})
+}
+```
+
+### Ownership Transfer
+Implement a two-step ownership transfer process.
+
+**controllers/product_controller.go (continued)**
+```go
+type TransferInput struct {
+    NewOwnerUsername string `json:"new_owner_username" binding:"required"`
+}
+
+func InitiateTransfer(c *gin.Context) {
+    productID := c.Param("id")
+    userID, _ := c.Get("user_id")
+
+    var product models.Product
+    if err := db.First(&product, productID).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+        return
+    }
+
+    var lastEvent models.Event
+    if err := db.Where("product_id = ? AND event_type = ?", productID, "ownership_transfer").Order("created_at desc").First(&lastEvent).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    var currentOwnerID uint
+    if lastEvent.ID != 0 {
+        var eventData map[string]interface{}
+        json.Unmarshal([]byte(lastEvent.EventData), &eventData)
+        currentOwnerID = uint(eventData["new_owner_id"].(float64))
+    } else {
+        // Assume initial owner is the one who registered it
+        var regEvent models.Event
+        if err := db.Where("product_id = ? AND event_type = ?", productID, "registration").First(&regEvent).Error; err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "No registration event found"})
+            return
+        }
+        currentOwnerID = regEvent.CreatedBy
+    }
+
+    if currentOwnerID != userID.(uint) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "Only the current owner can initiate a transfer"})
+        return
+    }
+
+    var input TransferInput
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    var newOwner models.User
+    if err := db.Where("username = ?", input.NewOwnerUsername).First(&newOwner).Error; err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "New owner not found"})
+        return
+    }
+
+    pendingTransfer := models.PendingTransfer{
+        ProductID:  product.ID,
+        NewOwnerID: newOwner.ID,
+    }
+
+    if err := db.Create(&pendingTransfer).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate transfer"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Transfer initiated"})
+}
+
+func ConfirmTransfer(c *gin.Context) {
+    productID := c.Param("id")
+    userID, _ := c.Get("user_id")
+
+    var pendingTransfer models.PendingTransfer
+    if err := db.Where("product_id = ? AND new_owner_id = ?", productID, userID).First(&pendingTransfer).Error; err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "No pending transfer found"})
+        return
+    }
+
+    event := models.Event{
+        ProductID:  pendingTransfer.ProductID,
+        EventType:  "ownership_transfer",
+        EventData:  fmt.Sprintf(`{"new_owner_id": %d}`, pendingTransfer.NewOwnerID),
+        CreatedBy:  userID.(uint),
+    }
+
+    if err := createEvent(&event); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log transfer event"})
+        return
+    }
+
+    if err := db.Delete(&pendingTransfer).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete pending transfer"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Transfer confirmed"})
+}
+```
+
+### Main Application
+Tie everything together in the main file.
+
+**main.go**
 ```go
 package main
 
 import (
-	"context"
-	"encoding/base64"
-	"log"
-	"net/http"
-	"os"
-
-	"github.com/gin-gonic/gin"
-	"cloud.google.com/go/dialogflow/apiv2"
-	dialogflowpb "cloud.google.com/go/dialogflow/apiv2/dialogflowpb"
-	"google.golang.org/api/option"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/jfcote87/esign"
+    "github.com/gin-gonic/gin"
+    "gorm.io/driver/postgres"
+    "gorm.io/gorm"
+    "your_project/controllers"
+    "your_project/middlewares"
+    "your_project/models"
 )
 
-// MongoDB connection
-var collection *mongo.Collection
-
-// Contract model
-type Contract struct {
-	ID          string      `bson:"_id,omitempty" json:"id"`
-	Title       string      `bson:"title" json:"title"`
-	Description string      `bson:"description" json:"description"`
-	Pay         float64     `bson:"pay" json:"pay"`
-	StartDate   string      `bson:"startDate" json:"startDate"`
-	EndDate     string      `bson:"endDate" json:"endDate"`
-	Parties     []Party     `bson:"parties" json:"parties"`
-	Status      string      `bson:"status" json:"status"`
-	Signatures  []Signature `bson:"signatures" json:"signatures"`
-}
-
-type Party struct {
-	Name  string `bson:"name" json:"name"`
-	Email string `bson:"email" json:"email"`
-}
-
-type Signature struct {
-	Party  string `bson:"party" json:"party"`
-	Signed bool   `bson:"signed" json:"signed"`
-}
-
-// DocuSign client
-var dsClient *esign.Client
-
-// Dialogflow client
-var dfClient *dialogflowpb.SessionsClient
+var db *gorm.DB
 
 func main() {
-	// Connect to MongoDB
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-	client, err := mongo.Connect(context.TODO(), clientOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
-	collection = client.Database("gigContracts").Collection("contracts")
+    dsn := "host=localhost user=gorm password=gorm dbname=gorm port=5432 sslmode=disable"
+    var err error
+    db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    if err != nil {
+        panic("failed to connect database")
+    }
 
-	// Initialize DocuSign client
-	integrationKey := os.Getenv("DS_INTEGRATION_KEY")
-	userId := os.Getenv("DS_USER_ID")
-	rsaKey := os.Getenv("DS_RSA_KEY")
-	dsClient, err = esign.New(integrationKey, userId, rsaKey)
-	if err != nil {
-		log.Fatalf("Failed to initialize DocuSign client: %v", err)
-	}
+    db.AutoMigrate(&models.User{}, &models.Product{}, &models.Event{}, &models.PendingTransfer{})
 
-	// Initialize Dialogflow client
-	ctx := context.Background()
-	dfClient, err = dialogflowpb.NewSessionsClient(ctx, option.WithCredentialsFile("path/to/service-account.json"))
-	if err != nil {
-		log.Fatalf("Failed to create Dialogflow client: %v", err)
-	}
+    r := gin.Default()
 
-	// Set up Gin router
-	r := gin.Default()
-	r.POST("/contracts", createContract)
-	r.GET("/contracts", getContracts)
-	r.GET("/contracts/:id", getContract)
-	r.POST("/contracts/:id/sign", signContract)
-	r.POST("/chatbot", chatbotHandler)
+    controllers.InitUserController(db)
+    controllers.InitProductController(db)
+    controllers.InitEventController(db)
 
-	r.Run(":8080")
-}
+    r.POST("/api/users/register", controllers.RegisterUser)
+    r.POST("/api/users/login", controllers.LoginUser)
 
-// Create a new contract
-func createContract(c *gin.Context) {
-	var contract Contract
-	if err := c.ShouldBindJSON(&contract); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	contract.ID = generateID()
-	contract.Status = "draft"
-	_, err := collection.InsertOne(context.TODO(), contract)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusCreated, contract)
-}
+    authorized := r.Group("/").Use(middlewares.AuthMiddleware())
+    {
+        authorized.POST("/api/products", controllers.RegisterProduct)
+        authorized.GET("/api/products/:id", controllers.GetProduct)
+        authorized.POST("/api/products/:id/events", controllers.CreateEvent)
+        authorized.POST("/api/products/:id/transfer", controllers.InitiateTransfer)
+        authorized.POST("/api/products/:id/transfer/confirm", controllers.ConfirmTransfer)
+        authorized.GET("/api/products/:id/verify", controllers.VerifyProductHistory)
+    }
 
-// Get all contracts
-func getContracts(c *gin.Context) {
-	cursor, err := collection.Find(context.TODO(), bson.M{})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	var contracts []Contract
-	if err = cursor.All(context.TODO(), &contracts); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, contracts)
-}
-
-// Get a specific contract
-func getContract(c *gin.Context) {
-	id := c.Param("id")
-	var contract Contract
-	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&contract)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
-		return
-	}
-	c.JSON(http.StatusOK, contract)
-}
-
-// Initiate signing with DocuSign
-func signContract(c *gin.Context) {
-	id := c.Param("id")
-	var contract Contract
-	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&contract)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
-		return
-	}
-
-	// Generate PDF (placeholder)
-	pdfContent := []byte("Contract PDF content") // Replace with actual PDF generation
-	pdfBase64 := base64.StdEncoding.EncodeToString(pdfContent)
-
-	// Create DocuSign envelope
-	envelope := esign.EnvelopeDefinition{
-		EmailSubject: "Sign your contract",
-		Status:       "sent",
-		Documents: []esign.Document{
-			{
-				Name:           "contract.pdf",
-				DocumentID:     "1",
-				DocumentBase64: pdfBase64,
-			},
-		},
-		Recipients: esign.Recipients{
-			Signers: []esign.Signer{
-				{
-					Name:        contract.Parties[0].Name,
-					Email:       contract.Parties[0].Email,
-					RecipientID: "1",
-					Tabs: esign.Tabs{
-						SignHereTabs: []esign.SignHere{
-							{
-								DocumentID: "1",
-								PageNumber: "1",
-								XPosition:  "100",
-								YPosition:  "100",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Send envelope
-	envelopeSummary, err := dsClient.Envelopes.Send(contract.ID, envelope)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Envelope sent", "envelopeId": envelopeSummary.EnvelopeID})
-}
-
-// Chatbot handler
-func chatbotHandler(c *gin.Context) {
-	var request struct {
-		Message string `json:"message"`
-		Session string `json:"session"`
-	}
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	ctx := context.Background()
-	req := dialogflowpb.DetectIntentRequest{
-		Session: request.Session,
-		QueryInput: &dialogflowpb.QueryInput{
-			Text: &dialogflowpb.TextInput{
-				Text:         request.Message,
-				LanguageCode: "en-US",
-			},
-		},
-	}
-	response, err := dfClient.DetectIntent(ctx, &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"response": response.QueryResult.FulfillmentText})
-}
-
-// Helper function to generate ID (placeholder)
-func generateID() string {
-	return "contract-" + string(rune(time.Now().UnixNano())) // Simple ID generation
+    r.Run(":8080")
 }
 ```
 
-#### Backend Features
-- **Contract Creation**: Accepts JSON input to create contracts, stored in MongoDB with a unique ID and "draft" status.
-- **Contract Retrieval**: Provides endpoints to list all contracts or fetch a specific contract by ID.
-- **E-Signature**: Integrates with DocuSign to send contracts for signing, using a placeholder PDF (requires actual PDF generation for production).
-- **Chatbot**: Processes user messages via Dialogflow, detecting intents and returning responses for dispute resolution.
-- **MongoDB Schema**: Stores contracts with fields for title, description, pay, dates, parties, status, and signatures.
+## Frontend Implementation (React)
 
-#### Setup Requirements
-- Install Go dependencies: `go get github.com/gin-gonic/gin go.mongodb.org/mongo-driver cloud.google.com/go/dialogflow/apiv2 github.com/jfcote87/esign`.
-- Set environment variables for DocuSign (`DS_INTEGRATION_KEY`, `DS_USER_ID`, `DS_RSA_KEY`) and Dialogflow (service account JSON file).
-- Run MongoDB locally or on a cloud instance (`mongodb://localhost:27017`).
-- Start the backend: `go run main.go`.
+### Project Structure
+```
+frontend/
+├── public/
+│   ├── index.html
+├── src/
+│   ├── components/
+│   │   ├── Navbar.js
+│   ├── pages/
+│   │   ├── Login.js
+│   │   ├── Register.js
+│   │   ├── ProductDetails.js
+│   ├── services/
+│   │   ├── api.js
+│   ├── context/
+│   │   ├── AuthContext.js
+│   ├── App.js
+│   ├── index.js
+├── package.json
+```
 
-### Frontend Implementation (React)
+### Setup
+Create a React project and install dependencies:
+```bash
+npx create-react-app frontend
+cd frontend
+npm install axios react-router-dom tailwindcss
+npx tailwindcss init
+```
 
-The frontend is a single-page React application styled with [Tailwind CSS](https://tailwindcss.com/) and uses [Axios](https://axios-http.com/) for API calls. It provides interfaces for contract creation, viewing, signing, and chatbot interaction.
+Configure Tailwind in `tailwind.config.js`:
+```js
+module.exports = {
+  content: ["./src/**/*.{js,jsx}"],
+  theme: { extend: {} },
+  plugins: [],
+}
+```
 
-#### Frontend Code
+Include Tailwind in `src/index.css`:
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
 
+### Main HTML
+**public/index.html**
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Micro-Contract Generator</title>
-  <script src="https://cdn.jsdelivr.net/npm/react@17/umd/react.development.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@17/umd/react-dom.development.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Second-Hand Product Verification</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@17/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    const App = () => {
-      const [contracts, setContracts] = useState([]);
-      const [showChatbot, setShowChatbot] = useState(false);
-      const [messages, setMessages] = useState([]);
-      const [newMessage, setNewMessage] = useState('');
-
-      useEffect(() => {
-        fetchContracts();
-      }, []);
-
-      const fetchContracts = async () => {
-        try {
-          const response = await axios.get('http://localhost:8080/contracts');
-          setContracts(response.data);
-        } catch (error) {
-          console.error(error);
-        }
-      };
-
-      const handleCreateContract = async (contract) => {
-        try {
-          await axios.post('http://localhost:8080/contracts', contract);
-          fetchContracts();
-        } catch (error) {
-          console.error(error);
-        }
-      };
-
-      const handleSignContract = async (id) => {
-        try {
-          await axios.post(`http://localhost:8080/contracts/${id}/sign`);
-          alert('Signing initiated');
-        } catch (error) {
-          console.error(error);
-        }
-      };
-
-      const handleSendMessage = async () => {
-        if (newMessage.trim() === '') return;
-        setMessages([...messages, { text: newMessage, sender: 'user' }]);
-        try {
-          const response = await axios.post('http://localhost:8080/chatbot', {
-            message: newMessage,
-            session: 'projects/your-project-id/agent/sessions/some-session-id',
-          });
-          setMessages((prev) => [...prev, { text: response.data.response, sender: 'bot' }]);
-        } catch (error) {
-          console.error(error);
-        }
-        setNewMessage('');
-      };
-
-      return (
-        <div className="container mx-auto p-4">
-          <h1 className="text-2xl font-bold mb-4">Micro-Contract Generator</h1>
-          <ContractForm onSubmit={handleCreateContract} />
-          <h2 className="text-xl font-semibold mt-6 mb-2">Contracts</h2>
-          <ul className="list-disc pl-5">
-            {contracts.map((contract) => (
-              <li key={contract.id} className="mb-2">
-                {contract.title} - {contract.status}
-                <button
-                  onClick={() => handleSignContract(contract.id)}
-                  className="ml-4 bg-blue-500 text-white px-2 py-1 rounded"
-                >
-                  Sign
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={() => setShowChatbot(!showChatbot)}
-            className="mt-4 bg-green-500 text-white px-4 py-2 rounded"
-          >
-            {showChatbot ? 'Close Chatbot' : 'Open Chatbot'}
-          </button>
-          {showChatbot && (
-            <Chatbot
-              messages={messages}
-              onSend={handleSendMessage}
-              newMessage={newMessage}
-              setNewMessage={setNewMessage}
-            />
-          )}
-        </div>
-      );
-    };
-
-    const ContractForm = ({ onSubmit }) => {
-      const [title, setTitle] = useState('');
-      const [description, setDescription] = useState('');
-      const [pay, setPay] = useState(0);
-      const [startDate, setStartDate] = useState('');
-      const [endDate, setEndDate] = useState('');
-      const [parties, setParties] = useState([{ name: '', email: '' }]);
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        const contract = {
-          title,
-          description,
-          pay: parseFloat(pay),
-          startDate,
-          endDate,
-          parties,
-          signatures: parties.map((party) => ({ party: party.name, signed: false })),
-        };
-        onSubmit(contract);
-        setTitle('');
-        setDescription('');
-        setPay(0);
-        setStartDate('');
-        setEndDate('');
-        setParties([{ name: '', email: '' }]);
-      };
-
-      const addParty = () => {
-        setParties([...parties, { name: '', email: '' }]);
-      };
-
-      return (
-        <div className="bg-gray-100 p-4 rounded">
-          <h2 className="text-xl font-semibold mb-2">Create Contract</h2>
-          <div>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title"
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description"
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <input
-              type="number"
-              value={pay}
-              onChange={(e) => setPay(e.target.value)}
-              placeholder="Pay"
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full p-2 mb-2 border rounded"
-            />
-            {parties.map((party, index) => (
-              <div key={index} className="flex mb-2">
-                <input
-                  type="text"
-                  value={party.name}
-                  onChange={(e) => {
-                    const newParties = [...parties];
-                    newParties[index].name = e.target.value;
-                    setParties(newParties);
-                  }}
-                  placeholder="Party Name"
-                  className="w-1/2 p-2 mr-2 border rounded"
-                />
-                <input
-                  type="email"
-                  value={party.email}
-                  onChange={(e) => {
-                    const newParties = [...parties];
-                    newParties[index].email = e.target.value;
-                    setParties(newParties);
-                  }}
-                  placeholder="Party Email"
-                  className="w-1/2 p-2 border rounded"
-                />
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addParty}
-              className="bg-gray-500 text-white px-2 py-1 rounded mb-2"
-            >
-              Add Party
-            </button>
-            <button
-              type="submit"
-              onClick={handleSubmit}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Create Contract
-            </button>
-          </div>
-        </div>
-      );
-    };
-
-    const Chatbot = ({ messages, onSend, newMessage, setNewMessage }) => {
-      return (
-        <div className="mt-4 bg-gray-100 p-4 rounded">
-          <h2 className="text-xl font-semibold mb-2">Dispute Resolution Chatbot</h2>
-          <div className="h-64 overflow-y-auto border p-2 mb-2">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`mb-2 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
-              >
-                <span
-                  className={`inline-block p-2 rounded ${
-                    msg.sender === 'user' ? 'bg-blue-200' : 'bg-gray-200'
-                  }`}
-                >
-                  {msg.text}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="flex">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && onSend()}
-              placeholder="Type your message..."
-              className="w-full p-2 border rounded"
-            />
-            <button
-              onClick={onSend}
-              className="ml-2 bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      );
-    };
-
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
+    <div id="root"></div>
 </body>
 </html>
 ```
 
-#### Frontend Features
-- **Contract Creation Form**: Allows users to input gig details (title, description, pay, dates, parties) and submit to create a contract.
-- **Contract List**: Displays all contracts with their titles and statuses, with a button to initiate signing.
-- **E-Signature**: Triggers the signing process by calling the backend's `/contracts/:id/sign` endpoint.
-- **Chatbot Interface**: Provides a chat window for dispute resolution, sending messages to the backend for Dialogflow processing.
-- **Styling**: Uses Tailwind CSS for a responsive, modern design.
+### Authentication Context
+Manage user authentication state.
 
-#### Setup Requirements
-- Save the HTML file and open it in a browser (ensure the backend is running at `http://localhost:8080`).
-- The app uses CDN-hosted React, Axios, and Tailwind CSS, so no additional installation is required.
-- Update the Dialogflow session ID in the chatbot API call to match your Dialogflow project.
+**src/context/AuthContext.js**
+```js
+import React, { createContext, useState, useEffect } from 'react';
 
-### Database (MongoDB)
+export const AuthContext = createContext();
 
-MongoDB stores contracts in the `gigContracts` database, `contracts` collection. The schema is:
+export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
 
-```json
-{
-  "_id": "contract-123",
-  "title": "Dog Walking Gig",
-  "description": "Walk client's dog twice daily",
-  "pay": 100.0,
-  "startDate": "2025-04-25",
-  "endDate": "2025-04-30",
-  "parties": [
-    {"name": "Alice", "email": "alice@example.com"},
-    {"name": "Bob", "email": "bob@example.com"}
-  ],
-  "status": "draft",
-  "signatures": [
-    {"party": "Alice", "signed": false},
-    {"party": "Bob", "signed": false}
-  ]
-}
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Decode token or fetch user info
+            setUser({ token });
+        }
+    }, []);
+
+    const login = (token) => {
+        localStorage.setItem('token', token);
+        setUser({ token });
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, login, logout }}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
 ```
 
-#### Setup
-- Install MongoDB locally or use a cloud service like [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
-- Ensure the MongoDB URI in the backend code matches your setup.
+### API Service
+Handle API requests with Axios.
 
-### Integrations
+**src/services/api.js**
+```js
+import axios from 'axios';
 
-#### DocuSign
-The backend uses the [esign library](https://github.com/jfcote87/esign) to interact with DocuSign's eSignature API. It creates an envelope with a placeholder PDF and sends it to the contract parties for signing.
+const api = axios.create({
+    baseURL: 'http://localhost:8080/api',
+});
 
-**Setup**:
-- Create a DocuSign developer account at [DocuSign Developer](https://developers.docusign.com/).
-- Generate an integration key, user ID, and RSA private key.
-- Set these as environment variables in the backend.
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
-**Note**: The current implementation uses a placeholder PDF. For production, integrate a PDF generation library like [gopdf](https://github.com/signintech/gopdf) to create contract PDFs.
+export const register = (data) => api.post('/users/register', data);
+export const login = (data) => api.post('/users/login', data);
+export const registerProduct = (data) => api.post('/products', data);
+export const getProduct = (id) => api.get(`/products/${id}`);
+export const createEvent = (id, data) => api.post(`/products/${id}/events`, data);
+export const initiateTransfer = (id, data) => api.post(`/products/${id}/transfer`, data);
+export const confirmTransfer = (id) => api.post(`/products/${id}/transfer/confirm`);
+export const verifyHistory = (id) => api.get(`/products/${id}/verify`);
+```
 
-#### Dialogflow
-The chatbot uses Dialogflow's [Go client library](https://pkg.go.dev/cloud.google.com/go/dialogflow/apiv2) to detect intents and provide responses for dispute resolution.
+### Main App
+Set up routing.
 
-**Setup**:
-- Create a Dialogflow agent at [Dialogflow Console](https://dialogflow.cloud.google.com/).
-- Set up intents for dispute resolution (e.g., "payment issue", "task not completed").
-- Download a service account JSON key and specify its path in the backend code.
-- Update the session ID in the frontend to match your Dialogflow project.
+**src/App.js**
+```js
+import React from 'react';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import Navbar from './components/Navbar';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ProductDetails from './pages/ProductDetails';
 
-### Plain Language (NLP)
-To ensure contracts are clear and simple, the implementation relies on user-provided inputs formatted into a straightforward structure. For advanced NLP, you could integrate a library like [TextRazor](https://www.textrazor.com/) or [Google Cloud Natural Language](https://cloud.google.com/natural-language) to analyze and simplify text, but this is not included in the current code.
+function App() {
+    return (
+        <AuthProvider>
+            <Router>
+                <div className="min-h-screen bg-gray-100">
+                    <Navbar />
+                    <Switch>
+                        <Route path="/login" component={Login} />
+                        <Route path="/register" component={Register} />
+                        <Route path="/products/:id" component={ProductDetails} />
+                    </Switch>
+                </div>
+            </Router>
+        </AuthProvider>
+    );
+}
 
-### Setup Instructions
+export default App;
+```
 
-1. **Backend**:
-   - Install Go: [Download Go](https://go.dev/dl/).
-   - Install dependencies: `go get github.com/gin-gonic/gin go.mongodb.org/mongo-driver cloud.google.com/go/dialogflow/apiv2 github.com/jfcote87/esign`.
-   - Configure environment variables for DocuSign and Dialogflow.
-   - Run MongoDB locally or via a cloud service.
-   - Start the backend: `go run main.go`.
+### Navbar Component
+**src/components/Navbar.js**
+```js
+import React, { useContext } from 'react';
+import { Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 
-2. **Frontend**:
-   - Save the provided HTML file as `index.html`.
-   - Open it in a browser with the backend running.
-   - Ensure CORS is enabled in the backend if running on different ports (add `r.Use(cors.Default())` with `github.com/gin-contrib/cors`).
+function Navbar() {
+    const { user, logout } = useContext(AuthContext);
 
-3. **Database**:
-   - Set up MongoDB with the `gigContracts` database and `contracts` collection.
-   - Verify the MongoDB URI in the backend code.
-
-4. **Integrations**:
-   - Configure DocuSign and Dialogflow as described above.
-   - Test the e-signature and chatbot functionalities.
-
-### Enhancements for Production
-- **User Authentication**: Add JWT-based authentication to secure user data.
-- **PDF Generation**: Use a library like [gopdf](https://github.com/signintech/gopdf) to generate contract PDFs.
-- **Advanced NLP**: Integrate an NLP service to enhance contract clarity.
-- **Session Management**: Implement proper session handling for the Dialogflow chatbot.
-- **Error Handling**: Add robust error logging and user-friendly error messages.
-- **HTTPS**: Use HTTPS for secure communication in production.
-
-### Impact
-The Micro-Contract Generator empowers gig workers by providing a tool to create legally sound agreements quickly, reducing the risk of disputes and unpaid work. The integration of e-signatures builds trust, while the chatbot offers a convenient way to mediate issues. By focusing on plain language, the app ensures accessibility for users without legal expertise.
-
-### Key Citations
-- [Gin Web Framework for Go](https://github.com/gin-gonic/gin)
-- [MongoDB Official Website
+    return (
+        <nav className="bg-blue-600 p-4">
+            <div className="
