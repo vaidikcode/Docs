@@ -1,88 +1,164 @@
-# EcoMorph Pods: Technical Blueprint
+Understood. Here's your document *exactly as written*, with no content changed or modified:
 
-EcoMorph Pods are envisioned as biodegradable capsules containing a consortium of microorganisms (fungi, bacteria, algae) and seeds. Thrown or deployed alongside plastic waste, each pod activates when in contact with moisture and plastic, initiating a staged process: the embedded microbes enzymatically break down single-use plastics into simpler organics, which are further mineralized into **soil-like humus**, and finally a plant seed within the pod germinates in the enriched soil. This closed-loop design combines *bioremediation* and *regenerative planting*, aiming to convert pollution into productive green space. The concept draws on advances in “living materials” and bio-encapsulation, integrating known plastic-degrading organisms with biodegradable housing to create a self-contained plastic-to-plant system.
+---
 
-## 1. Biological Principles of Plastic Degradation
+# Chemistry Practical: Titration & Analysis Overview
 
-Plastics are long-chain polymers (e.g. polyesters, polyolefins) that resist breakdown. However, many microbes produce enzymes that cleave specific chemical bonds in these polymers. In general, **ester bonds** (found in PET, polyurethanes, polyesters, etc.) can be hydrolyzed by hydrolase enzymes (cutinases, lipases, PETases). For example, PET-degrading bacteria secrete **PETase** that hydrolyzes PET into mono(2-hydroxyethyl)terephthalate (MHET), and MHETase that further yields terephthalic acid (TPA) and ethylene glycol. These monomers are metabolized via central carbon pathways, ultimately producing CO₂ and biomass. Polyurethanes and polycaprolactones are similarly attacked by cutinases/lipases. In contrast, **polyolefins** like polyethylene (PE/PP) lack easily hydrolyzable bonds; fungi and bacteria use oxidative enzymes (laccases, peroxidases, monooxygenases) to introduce functional groups before further degradation. For instance, fungal laccases and peroxidases can oxidize PE/PVC chains, creating carboxylic/aldehyde end groups that other enzymes or microbes can consume. In practice, a mixed consortium of organisms may be needed to tackle a broad range of plastics: some microbes specialize in initial oxidation, others in hydrolysis of ester bonds, and still others in assimilating the resulting fragments into cell carbon. Key factors in the breakdown process include **temperature, pH, moisture, and oxygen** – conditions that must be optimized (typically warm, moist, aerobic composting conditions work best).
+---
 
-## 2. Plastic-Eating Organisms: Current Research
+## - Alkalinity and Chloride Content
 
-Researchers have discovered numerous plastic-degrading microorganisms and engineered novel strains:
+* **H₂SO₄ (Methyl Orange)** → 25 mL water
+* **AgNO₃ (Potassium Dichromate)** → 10 mL water
+* *(5 Times each)*
 
-* **Ideonella sakaiensis** (bacterium): Discovered in 2016, it uses two enzymes (PETase and MHETase) to depolymerize PET into its monomers (terephthalic acid and ethylene glycol) under aerobic conditions. It can grow on PET as its sole carbon source.
-* **Engineered bacteria:** For example, Shi *et al.* engineered *E. coli* to secrete *I. sakaiensis* PETase by optimizing a signal peptide, greatly boosting PET hydrolysis rates. Similarly, researchers have delivered a “FAST-PETase” gene cassette to environmental bacteria: these engineered bacteria degraded about 40% of a PET film in just 4 days at 50 °C. Such synthetic biology approaches are rapidly improving plastic degradation efficiency.
-* **Fungi:** Soil fungi are rich sources of degraders. *Aspergillus tubingensis*, for instance, can colonize plastic surfaces and secrete enzymes that cleave polymer bonds. More broadly, many **Aspergillus** species (e.g. *A. niger, A. terreus*) and other ascomycetes (e.g. *Chaetomium globosum*, *Fusarium solani*) have been reported to degrade various plastics. White-rot fungi (e.g. *Phanerochaete chrysosporium*) produce powerful lignin-degrading enzymes (laccases, peroxidases) that can also attack polyethylene and polypropylene.
-* **Algae and microbial consortia:** Some studies suggest microalgae might contribute to plastic breakdown, either by secreting degradative enzymes or through symbiosis in biofilms. For example, certain green algae have been reported to produce oxygen radicals or enzymes that partially decompose plastics. In practice, mixed “plastisphere” communities (bacteria + fungi + algae) may act synergistically.
-* **Insects (indirect):** While not microbes, insects like waxworms or mealworms have drawn attention for PS degradation; in EcoMorph Pods, such roles are filled by microbes/fungi instead.
+---
 
-Collectively, over 400 species of bacteria and fungi are known or suspected to degrade one or more plastic types. Continued bioprospecting and enzyme engineering (e.g. AI-designed PETases) promise further advances. (For example, engineered enzymes have increased PET degradation rates well beyond natural levels.) These findings form the biological backbone of the EcoMorph concept.
+## - Temporary and Permanent Hardness of Water
 
-## 3. Encapsulation and Activation of Living Organisms
+* We need hard water which will be provided.
 
-To harness these organisms safely, EcoMorph Pods propose keeping them in a **dormant, contained state** until contact with plastic triggers them. A practical strategy is to encapsulate microbes as resistant *spores* or lyophilized cells within a biodegradable matrix. For instance, *Bacillus subtilis* spores can withstand high temperatures and desiccation. Researchers have extruded TPU plastic mixed with *B. subtilis* spores: after hot extrusion (135 °C), the spores remained viable. In the pod, these spores stay inactive until moistened. Upon contact with water and nutrients (e.g. soil compost), the spores germinate and secrete their plastic-degrading enzymes. This design parallels “seed coatings” in agriculture: microbes or actives embedded in gelatin/alginate films or pellets that only become active when planted. By analogy, EcoMorph Pods could use hydrogel beads or porous carriers containing a microbial consortium. Activation triggers include **moisture, carbon sources or pH change**. For example, one study found that simply immersing the spore-infused TPU strips in humid compost (37 °C, \~50% RH) led to germination and \~90% plastic degradation in 5 months.
+* **EDTA** → 10 mL Hard Water
+  (**Ammonium Chloride Buffer (2–3 mL) + EBT indicator**)
+  *(4 times)*
 
-Safety measures would ensure organisms don’t escape unintentionally. Using well-studied, non-pathogenic strains (e.g. probiotic *B. subtilis*, certain *Aspergillus* strains) is essential. (Indeed, *B. subtilis* is widely used in agriculture and is generally regarded as safe, even beneficial to plants.) Genetic **kill-switches** or nutrient auxotrophy could further contain engineered strains. In summary, EcoMorph Pods borrow from proven encapsulation techniques (alginate beads, seed-pellet coatings) and “living plastic” engineering to keep microbes sealed until deployment.
+* Water gives **total hardness**
 
-## 4. Plastic-to-Soil Conversion Process
+* Distilled water gives **permanent hardness**
 
-Once activated, the capsule’s microbes break down the plastic and convert it into soil-like humus. The process proceeds in stages:
+---
 
-1. **Depolymerization:** Enzymes cleave the plastic’s polymer chains into oligomers and monomers. For example, PET chains are hydrolyzed to MHET and then to terephthalic acid (TPA) and ethylene glycol (EG). Urethane or ester linkages in polyurethane are similarly cleaved by esterases. Oxidative enzymes introduce oxygen into PE/PP chains, creating carboxylates.
-2. **Assimilation and Mineralization:** Microbes take up the smaller molecules. Bacteria/fungi metabolize monomers via central metabolic pathways (e.g. TPA can enter the protocatechuate/catechol pathways) and ultimately generate CO₂, water, and biomass. Extensive degradation can be measured by CO₂ evolution: indeed, laboratory assays quantify plastic biodegradation by monitoring CO₂ released from microbe cultures with only the plastic as carbon source. In one PET biodegradation study, CO₂ production directly correlated with polymer breakdown, illustrating that microbial respiration is the main sink of plastic carbon.
-3. **Soil Formation:** The microbial biomass and any remaining organic residues become soil organic matter (humus). This enriches the local substrate with carbon, nitrogen, and nutrients (especially if added with the pod). Ideally, >90% of the plastic carbon ends up as CO₂ or incorporated into biomass, with little toxic residue. (In practice, known biodegradable-plastic standards require the material to convert to CO₂, water, and biomass under composting conditions, leaving no persistent fragments.) For example, in controlled tests, *B. subtilis* spore-infused TPU lost \~92.7% of its weight in 5 months of composting (vs \~43.9% for non-living TPU). The result was a brown, powdery material (see image below) that could serve as soil.
+## - Fe³⁺ and Fe²⁺
 
-&#x20;*Plastic feedstock (left) and degraded residue (right) from a living-plastic experiment. A biodegradable TPU pellet mixed with *B. subtilis* spores (left) was incubated in compost; after months, the plastic was mostly consumed, leaving a brown powder (right).*
+* **KMnO₄** → 10 mL FAS + 5 mL H₂SO₄ *(5 times)*
+* **KMnO₄** → 10 mL Given Sol + 5 mL H₂SO₄ *(5 times)* (**Fe²⁺**)
+* **KMnO₄** → 10 mL Given Sol + 5 mL H₂SO₄ *(5 times)* (**Total Iron Content**)
 
-Environmental conditions strongly affect the process. Warm, moist, aerated conditions (similar to industrial composting) dramatically accelerate breakdown. In the UCSD study, maintaining compost at \~37 °C and \~50% relative humidity triggered rapid spore germination and enzyme activity. Under these conditions, the living TPU strips lost most of their mass (as CO₂ and biomass) within months. Oxygen is generally needed for aerobic degradation steps, so the pod material must allow gas exchange. The design could incorporate micro-perforations or oxygen-permeable films to ensure aerobic conditions. Moisture control is also critical: the pod might use internal hydrogels or cotton wicks to evenly distribute water to the microbes without drowning them. By fine-tuning these parameters, EcoMorph Pods aim to maximize the conversion of plastics into stable organic soil constituents.
+---
 
-## 5. Plant Integration and Germination
+## - NaOH and Na₂CO₃
 
-A distinguishing feature of EcoMorph Pods is the incorporation of a plant seed, turning waste clean-up into habitat generation. After the plastic is degraded, the remaining “soil” is a substrate for the embedded seed. Key considerations include:
+* **HCl** → 10 mL Na₂CO₃ (Methyl Orange) *(5 Times)*
 
-* **Seed selection:** Hardy, fast-growing native species or legumes (to fix nitrogen) are preferred. The seed should tolerate the (initially still-degrading) environment and germinate easily. Seeds are naturally desiccation-resistant and can remain dormant until conditions are right.
-* **Nutrient provisioning:** To support early growth, each pod could include a small admixture of organic fertilizer or mineral nutrients. The microbial consortium itself can supply some nutrients (e.g. phosphorus-solubilizing bacteria, mycorrhizal fungi releasing bound N/P). The leftover microbial biomass in the pod soil also acts as a nutrient-rich humus.
-* **Moisture and exposure:** Once the plastic is gone, the pod casing should be fully broken down or removed, allowing light and air to reach the seed. The pod design might include a water-permeable cover that dissolves over time, exposing the germinating seed to rain and sun.
-* **Symbiotic support:** The fungal components in the pod (e.g. *Aspergillus*, mycorrhizal fungi) can form beneficial associations with the seedling roots, aiding nutrient uptake and plant establishment. Likewise, if photosynthetic algae are present, their oxygen production and carbon fixation can enrich the local micro-environment.
+* **HCl** → 10 mL of mixture of both NaOH and Na₂CO₃
+  (2–3 drops of **Phenolphthalein**) → **\[P]**
 
-Conceptually, this is similar to “seed balls” or engineered seed pods used in ecological restoration: a protective casing around a seed with nurturing materials. For example, AirSeedTech has developed drone-deployed **biodegradable seed pods** containing seed, nutrients, and a protective shell; their pods improve germination and early growth rates of native plants. EcoMorph Pods extend this idea by coupling it with bioremediation. Importantly, the microbial species chosen are plant-friendly: *B. subtilis* spores, for instance, are known as plant probiotics and are generally regarded as safe (even beneficial) for plant health. As the pod transforms into soil, the seed germinates, turning the former plastic waste into a living plant.
+* The first corresponds to **P endpoint**,
+  in same solution add 2–3 drops of **Methyl Orange**
+  and continue titration → **\[M]**
 
-## 6. Capsule Material and Design Requirements
+* This is total volume noted for **Methyl endpoint**
 
-The pod housing must be **biodegradable** itself, so it does not leave harmful waste. Potential materials include natural polymers and fungal composites. Examples:
+---
 
-* **Polysaccharide-based plastics:** PLA, PHA/PHB, starch-based plastics, and cellulose derivatives (e.g. cellulose acetate) are industrial bioplastics that compost under the right conditions. Chitosan, gelatin–gum arabic blends, and alginate have been used in biodegradable seed coatings. A thin outer film of these materials could form the pod shell, keeping contents dry until deployment but degrading once buried or wet.
-* **Mycelium composites:** Fungal mycelium grown on agricultural waste (e.g. straw, husks) can be molded into strong, lightweight shapes. Companies like Ecovative produce mushroom-based packaging and insulation that fully composts in weeks. Mycelium’s natural porosity and strength make it an attractive pod material: it can be grown in molds to form rigid shells, and it inherently allows moisture and gas diffusion while providing structural integrity. After use, the mycelium turns into rich biomass (fungal cell walls are largely sugars).
-* **Layered structure:** A multi-layered design could regulate internal conditions. For instance, an **inner biodegradable film** (e.g. PVOH or starch) could be water-permeable to keep the microbes moist, surrounded by a **buffer layer** of a hygroscopic gel or sponge to even out moisture fluctuations. An **outer tough layer** (mycelium or thicker bioplastic) protects against physical damage and UV, but contains perforations or micropores for O₂/CO₂ exchange. Materials like electrospun nonwoven fibers or microporous films (analogous to breathable seed coatings) can be engineered to be oxygen-permeable yet waterproof.
-* **Mechanical durability:** Pods must survive handling, shipping, or aerial deployment. The mycelial network or fiber reinforcement can improve tensile strength (much like rebar in concrete). For example, embedding spores into TPU actually **improved** tensile strength in tests, suggesting microbial fillers can double as reinforcement. The choice and thickness of material balance longevity (must hold microbes safely for months/years) versus ease of breakdown once activated.
-* **Byproduct safety:** Any additives or colorants must be benign. If dyes or fertilizer are included, they should also be biodegradable or nutritive. As the pod composts, all components (shell, nutrient packs, etc.) should ideally be edible to soil microbes, leaving no microplastic or toxins. Mycelium and natural fibers meet this criterion naturally.
+## - To Determine the Copper Content of a Given Sample of Copper Ore Solution
 
-In sum, the capsule is envisioned as a **biodegradable bioreactor**, using materials from renewable sources. Its design draws on advances in **bio-based packaging** and **living materials**: for example, eco-packaging by Ecovative (mycelium) or agricultural seed encapsulants made of alginate/chitosan. The result is a capsule that protects its living cargo until use, then self-disintegrates into the enriched soil.
+* Using **0.1 N Sodium Thiosulphate**
 
-## 7. Existing Prototypes and Analogous Technologies
+### PROCEDURE
 
-Several projects hint at parts of the EcoMorph concept:
+1. Pipette out **10 mL** of the copper ore solution into a titration flask.
+2. Add a small amount of **solid NaHCO₃** to the ore solution in small doses until there is **no effervescence**. The solution turns **milky**.
+3. Add **dilute acetic acid dropwise**, just enough to remove the milkiness. A **clear blue solution** is formed.
+4. Add **5 mL of 10% KI solution**. The solution turns **dark brown** due to formation of **KI₃**.
+5. Add about **35 mL of distilled water** to dilute the contents. Wait for **at least 3 minutes**.
+6. Titrate the solution against **standard sodium thiosulphate solution** until the color turns **pale/light yellow**.
+7. Add about **2 mL of 1% freshly prepared starch solution**. The color turns **deep blue**.
+8. Continue titration with more sodium thiosulphate until the color changes from **blue to permanent white**.
+9. Let the flask sit for some time. If the solution turns **blue again**, add a few more drops of **Na₂S₂O₃** until the solution remains permanently white.
+10. Repeat the experiment **at least 5 times**, ensuring at least **2 concordant readings** are obtained.
 
-* **Living plastics (microbe-filled polymers):** The UC San Diego “living plastic” is a direct precursor. In this system, *B. subtilis* spores were embedded in TPU. The composite was mechanically robust as plastic, but in compost the spores germinated and decomposed the TPU (achieving \~90% mass loss in 5 months). This is essentially an EcoMorph Pod without the plant seed.
-* **Mycelium-based packaging:** Companies like Ecovative (Mushroom Packaging) grow mycelium into shapes to replace Styrofoam or plastic packaging. These products are 100% compostable in \~45 days. The Bulletin of the Atomic Scientists notes that mycelium composites have the strength and insulation of plastics, but break down into soil, supporting the idea of using fungi as pod materials. Likewise, startups are making mycelium buoys and coolers: one EHN report highlights fungi-based products (for seafood industry) that, unlike plastic foam, compost fully into fertilizer. These demonstrate the viability of mycelium in harsh applications.
-* **Seed balls and pods:** In permaculture and reforestation, *seed balls* (seeds mixed with clay/compost) are thrown into degraded land to promote vegetation. AirSeedTech has commercialized this: their drones can plant 250,000 **biodegradable seed pods** per day, each pod containing seeds and nutrients in a custom shell. These pods improve germination rates and protect seeds from predation. While they do not degrade plastic, they exemplify embedding a seed in a capsule for ecosystem restoration.
-* **Biodegradable mulch and pots:** Biodegradable polymer pots and films (made of starch or PLA) are used in horticulture, embedding nutrients or microbes. These technologies show that living roots and microbes can thrive in fully biotic containers.
-* **Bio-digesters:** Household “BioPods” or composters using larvae or worms (though insect-based) demonstrate consumer interest in compact organic waste recyclers. Similarly, “Engineered living materials” research embeds cells in building materials (e.g. self-healing concrete with bacteria).
+---
 
-Although no single prototype currently does *all* EcoMorph functions, each element exists. The integrated capsule is new: combining plastic digestion with immediate plant growth. The cited examples demonstrate feasibility – mycelium materials and spore-plastics have been proven, and drone-deployed seed pods are commercially used. These analogues validate the core ideas behind EcoMorph Pods.
+* strength of sodium hydroxide solution by titration with
+  standard hydrochloric acid (0.1 N)
 
-## 8. Future Prospects and Scale-Up
+50ml HCL in beaker and add cell to measure conductivity
+NaOH -> Hcl at intervals of 0.5ml and readings are noted.
+Plot the conductance against the volume of NaOH added
 
-The EcoMorph Pod concept is futuristic but grounded in emerging science. Key trends suggest scalability is plausible:
+---
 
-* **Advances in synthetic biology:** Enzyme- and microbe-engineering is accelerating. Recent breakthroughs (e.g. AI-designed PETases) mean that microbial strains will become more efficient at plastic degradation. For example, the aforementioned engineered bacteria achieved 40% PET film degradation in just 4 days, a pace that could increase further.
-* **Modular deployment:** Pods could be mass-produced (through injection molding or 3D printing of biopolymers) and distributed like seeds or pellets. Organizations already deploy microbial treatments in agriculture on large scales, indicating logistics can be managed. EcoMorph Pods might be dropped by drones in plastic-polluted parks or tossed into ocean plastic clusters (using buoyant shells).
-* **Positive feedback:** Every pod turns local plastic into soil and a plant, gradually restoring soil health and vegetation cover. Plants then sequester carbon and prevent erosion, compounding ecological benefits. In farmland or urban settings, pods could convert plastic litter into garden beds or green strips.
-* **Research directions:** The UCSD team is already scaling their TPU-bioplastic production to kilogram levels and exploring other polymers beyond TPU. They are evolving bacterial strains for faster breakdown. Similar R\&D programs (e.g. at DOE, universities, startups) focus on plastic-eating enzyme cocktails. This momentum will speed up EcoMorph-compatible microbe development.
-* **Regulatory and safety considerations:** As pods would release living organisms, there will be regulatory oversight (like any biocontrol). However, using non-engineered “GRAS” microbes or built-in kill switches can ease approval. Public acceptance will hinge on demonstrating that no pathogenic or invasive species are involved.
-* **Challenges:** Economics (cost of producing living capsules vs. handling waste), effectiveness in variable real-world environments, and ensuring pods reach enough plastic-littered sites are all open issues. Long-term studies will be needed to verify that introduced microbes do not disrupt local ecosystems.
-* **Opportunities:** If solved, EcoMorph technology offers a way to turn *ambient* plastic waste (landfill, urban runoff, beaches) into a resource, effectively making trash into “instant garden”. In the circular economy framework, it closes the loop: single-use plastic becomes soil fertilizer. It could complement recycling by handling the “unrecyclables” and microplastics.
+* Determine pKa value of acetic acid by pH metric titration
+  Titration of unknown HA with standard NaOH
 
-In conclusion, EcoMorph Pods leverage cutting-edge biotechnology to propose a sustainable remediation pathway. They integrate living systems (microbes + plants) in a capsule that autonomously degrades plastic and regenerates soil. Early prototypes and research point to feasibility, and ongoing advances (e.g. 90% TPU breakdown, rapid engineered PETase degradation) suggest real-world scale-up is attainable. With further R\&D, pilot tests, and interdisciplinary collaboration, EcoMorph Pods could become a practical tool in tackling plastic pollution and fostering re-greening efforts.
+1. Calibrate the pH meter with the standard buffer solution of pH = 4 or 9, then rinse the glass
+   electrode and immerse it in the beaker. Position the burette so that the titrant can be easily added.
+2. Pipette out 50 ml of acetic acid into a clean beaker, dip the glass electrode. Record the pH.
+3. Initially, add 0.5 ml of 0.1 N NaOH solution at a time, record the pH (after each addition), until
+   the pH change is more than 0.2‒0.3 units, then start adding 0.2 ml of NaOH each time (i.e., near
+   to the equivalence point, decrease the volume of NaOH added) so that the change in pH is small
+   enough to yield a good shape of plot.
+4. After the rapid change in pH (after the equivalent point), the volume of NaOH may again be
+   increased to 0.5 ml per addition. Make at least 10 more additions after the equivalence point so
+   that the region with the plateau can be plotted.
 
-**References:** We have drawn on recent studies and reports in biotechnology and materials science. These and other sources document the enzymes, organisms, and materials relevant to EcoMorph Pods, as well as exemplar technologies (see above citations) that inform this conceptual design.
+---
+
+* standard electrode potential of ferrous-ferric
+  system.
+
+PROCEDURE
+
+1. Take 50 ml of 0.1 N FAS solution in the beaker and add 5 ml of 1N sulphuric acid. Dip the
+   platinum and saturated calomel electrodes in the solution.
+2. Connect the indicator and the reference electrodes to the black and red terminals of the
+   potentiometer, respectively.
+3. Rinse and fill the burette with KMnO4 (0.2 N).
+4. Note the initial emf of the cell and start addition of the titrant (KMnO4) in portions of 1 mL
+   each. Near the equivalence point, decrease the volume of additional titrant to 0.5 ml and later on
+   to 0.2 ml and note down to reading after each addition.
+5. Continue to take 10-12 readings more, after a sharp change/increase in emf is noticed.
+6. Plot emf (in volts) against the volume of KMnO4 solution added (mL) and note down the
+   equivalence point and the potential at half the equivalence point.
+
+---
+
+* EXPERIMENT: Spectrophotometric determination of iron(II) with 1,10-phenanthroline
+
+PROCEDURE
+A. Preparation of Samples
+
+1. Take six 50 mL volumetric flasks and add 0, 1, 2, 3, 4, 5 ml of FAS solution in each flask. Let’s
+   name these volumetric flasks as K, L, M, N, O and P.
+2. Then add 2 ml of 1,10-phenanthroline solution to each of these volumetric flasks.
+3. Now dilute each volumetric flask with deionised water to afford a total volume of 50 mL (by
+   filling the these flasks upto the mark). Stopper the flasks and mix the contents well by shaking
+   vigorously for few minutes. Allow the solution to stand for 10 minutes.
+4. The first volumetric flask to which 0 ml of FAS is added (i.e., no Fe2+ ions), will serve as a
+   blank. (Solution K).
+   The Fe concentration in these flasks will be:
+   K 0.0 N N 6.0 × 10⁻⁵ N
+   L 2.0 × 10⁻⁵ N O 8.0 × 10⁻⁵ N
+   M 4.0 × 10⁻⁵ N P 10.0 × 10⁻⁵ N
+
+B. To determine the λmax
+
+1. Get the two cuvettes issued from the laboratory staff.
+2. Fill one of them with the blank solution (K) and another one with the one of the samples
+   containing Fe. Let’s say solution P.
+3. Light of single wavelength can be produced by selecting the filter on the photocolorimeter.
+   Usually, the range goes from 410 nm‒700 nm.
+4. Set the filter to 410 nm. Place the cuvette filled with blank solution, K, in the sample holder.
+5. Set the absorbance to 0%.
+6. Now place the second cuvette, with solution P, in the sample holder. Measure the absorbance
+   of the solution. Now you have the absorbance at 410 nm for solution P.
+7. By changing the filter to next wavelength each time, repeat steps 4‒6. You need to set the
+   absorbance to zero with blank (K) every time you change the wavelength with filter.
+8. Now, you have absorbance of solution P, over a range of wavelength from 410 nm-700 nm. You
+   will notice that graph between the Absorbance and wavelength takes an inverse parabola
+   shape, with a maximum absorbance around 500 nm or 480 nm. This is your λmax.
+
+C. Measurement of Absorbance for Solutions L to P at λmax
+
+1. Set the filter to λmax obtained in part B (step 8).
+2. Set the absorbance to 0 using your blank sample (K).
+3. Measure the absorbance for solutions L to P now at λmax. Don’t disturb the filter in between.
+4. Now measure the absorbance for an unknown sample provided to you.
+5. Plot absorbance vs. concentration for samples L to P. Connecting maximum points, draw a
+   straight line ideally passing through origin.
+6. Using absorbance value for the unknown, find out its concentration.
+
+---
+
+Would you like this exported as a PDF or formatted in any other way for printing or submission?
