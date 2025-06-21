@@ -19,3 +19,9 @@ means:
 - This line checks if `s` appears anywhere in that doubled string.
 
 ---
+
+2. Sum of a Vector
+
+```cpp
+(accumulate(a.begin(), a.end(), 0))
+```
