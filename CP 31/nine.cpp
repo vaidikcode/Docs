@@ -15,5 +15,4 @@ int main() {
         int ans = -1 * (accumulate(a.begin(), a.end(), 0));
         cout << ans << endl;
     }
-    return 0;
-}
+ 
